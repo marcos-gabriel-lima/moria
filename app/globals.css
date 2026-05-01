@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 43 56% 55%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 0 100% 27%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 84% 40%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 0 0% 16%;
+    --input: 0 0% 13%;
+    --ring: 43 56% 55%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background-color: rgba(201, 168, 76, 0.3);
+    color: #f5f5f5;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #c9a84c;
+  }
+}
+
+@layer components {
+  .gold-text {
+    @apply bg-gold-gradient bg-clip-text text-transparent;
+  }
+
+  .glass-card {
+    @apply bg-moria-surface/80 backdrop-blur-md border border-moria-border;
+  }
+
+  .subscriber-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold;
+    background: linear-gradient(135deg, rgba(201, 168, 76, 0.2), rgba(212, 175, 55, 0.1));
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    color: #C9A84C;
+    box-shadow: 0 0 12px rgba(201, 168, 76, 0.15);
+  }
+
+  .slot-available {
+    @apply bg-moria-elevated hover:bg-green-950/40 border border-moria-border hover:border-green-800/50
+           text-muted-foreground hover:text-green-400 transition-all cursor-pointer;
+  }
+
+  .slot-taken {
+    @apply bg-moria-surface/30 border border-moria-border/50 text-muted-foreground/30 cursor-not-allowed;
+  }
+
+  .slot-selected {
+    border: 1px solid #C9A84C;
+    color: #C9A84C;
+    background: rgba(201, 168, 76, 0.1);
+    box-shadow: 0 0 12px rgba(201, 168, 76, 0.2);
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium
+           text-muted-foreground hover:text-foreground hover:bg-moria-elevated
+           transition-all duration-200;
+  }
+
+  .nav-link.active {
+    color: #C9A84C;
+    @apply bg-moria-elevated;
+    border-left: 2px solid #C9A84C;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(201, 168, 76, 0.08) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+}
