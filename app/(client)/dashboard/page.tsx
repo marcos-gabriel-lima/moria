@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Calendar, Crown, Clock, ChevronRight, Scissors, AlertCircle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { SubscriberBadge } from '@/components/shared/subscriber-badge'
 import { AppointmentCard } from '@/components/appointments/appointment-card'
 import { formatDate } from '@/lib/utils'
@@ -9,9 +9,9 @@ import { formatDate } from '@/lib/utils'
 export const metadata = { title: 'Início' }
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
+  const supabase = await createClient()
 
   const [{ data: profile }, { data: subscription }, { data: upcomingApts }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),

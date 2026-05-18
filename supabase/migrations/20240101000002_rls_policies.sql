@@ -2,6 +2,8 @@
 -- MORIA BARBERSHOP — Row Level Security (RLS)
 -- ============================================================
 
+set search_path to extensions, public, auth;
+
 -- Habilitar RLS em todas as tabelas
 alter table public.profiles          enable row level security;
 alter table public.plans             enable row level security;

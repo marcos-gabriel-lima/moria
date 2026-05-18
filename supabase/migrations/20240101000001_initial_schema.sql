@@ -3,8 +3,11 @@
 -- ============================================================
 
 -- Extensões necessárias
-create extension if not exists "uuid-ossp";
-create extension if not exists "pgcrypto";
+create extension if not exists "uuid-ossp" schema extensions;
+create extension if not exists "pgcrypto" schema extensions;
+
+-- Expõe funções de extensões sem prefixo de schema
+set search_path to extensions, public, auth;
 
 -- ============================================================
 -- ENUMS
@@ -44,7 +47,7 @@ comment on table public.profiles is 'Perfis de usuários — clientes, barbeiros
 -- ============================================================
 
 create table public.plans (
-  id            uuid primary key default uuid_generate_v4(),
+  id            uuid primary key default gen_random_uuid(),
   name          text not null,
   slug          text not null unique,
   description   text,
@@ -68,7 +71,7 @@ comment on table public.plans is 'Planos de assinatura da barbearia';
 -- ============================================================
 
 create table public.subscriptions (
-  id                uuid primary key default uuid_generate_v4(),
+  id                uuid primary key default gen_random_uuid(),
   client_id         uuid not null references public.profiles(id) on delete cascade,
   plan_id           uuid not null references public.plans(id),
   status            subscription_status not null default 'pending',
@@ -122,7 +125,7 @@ comment on table public.barbers is 'Dados adicionais dos barbeiros';
 -- ============================================================
 
 create table public.services (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default gen_random_uuid(),
   name            text not null,
   description     text,
   category        service_category not null,
@@ -144,7 +147,7 @@ comment on table public.services is 'Catálogo de serviços oferecidos';
 -- ============================================================
 
 create table public.appointments (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default gen_random_uuid(),
   client_id       uuid not null references public.profiles(id) on delete cascade,
   barber_id       uuid not null references public.barbers(id),
   subscription_id uuid references public.subscriptions(id),
@@ -170,7 +173,7 @@ comment on table public.appointments is 'Agendamentos da barbearia';
 -- ============================================================
 
 create table public.appointment_services (
-  id             uuid primary key default uuid_generate_v4(),
+  id             uuid primary key default gen_random_uuid(),
   appointment_id uuid not null references public.appointments(id) on delete cascade,
   service_id     uuid not null references public.services(id),
   price          numeric(10,2) not null,
@@ -186,7 +189,7 @@ comment on table public.appointment_services is 'Serviços vinculados a cada age
 -- ============================================================
 
 create table public.products (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default gen_random_uuid(),
   name            text not null,
   description     text,
   price           numeric(10,2) not null,
@@ -206,7 +209,7 @@ comment on table public.products is 'Produtos disponíveis para venda';
 -- ============================================================
 
 create table public.payments (
-  id              uuid primary key default uuid_generate_v4(),
+  id              uuid primary key default gen_random_uuid(),
   client_id       uuid not null references public.profiles(id),
   appointment_id  uuid references public.appointments(id),
   subscription_id uuid references public.subscriptions(id),
@@ -231,7 +234,7 @@ comment on table public.payments is 'Histórico financeiro de pagamentos';
 -- ============================================================
 
 create table public.blocked_slots (
-  id          uuid primary key default uuid_generate_v4(),
+  id          uuid primary key default gen_random_uuid(),
   barber_id   uuid not null references public.barbers(id) on delete cascade,
   starts_at   timestamptz not null,
   ends_at     timestamptz not null,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -46,6 +47,7 @@ interface EditBarberFormProps {
 }
 
 export function EditBarberForm({ barber }: EditBarberFormProps) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -96,7 +98,7 @@ export function EditBarberForm({ barber }: EditBarberFormProps) {
         <span className="text-sm">Barbeiro ativo</span>
         <ToggleSwitch
           checked={barber.is_active}
-          onToggle={(v) => toggleBarberActive(barber.id, v).then(() => window.location.reload())}
+          onToggle={(v) => toggleBarberActive(barber.id, v).then(() => router.refresh())}
         />
       </div>
 

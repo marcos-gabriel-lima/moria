@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { MoreHorizontal, UserX, UserCheck, FileText, Crown, X } from 'lucide-react'
 import { toggleClientActive, updateClientNotes, cancelClientSubscription, grantManualSubscription } from '@/actions/admin'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,7 @@ export function ClientDetailActions({
   activeSubscriptionId,
   plans,
 }: ClientDetailActionsProps) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [open, setOpen] = useState<'menu' | 'notes' | 'grant' | null>(null)
   const [notesValue, setNotesValue] = useState(notes)
@@ -73,7 +75,7 @@ export function ClientDetailActions({
 
               {activeSubscriptionId && (
                 <button
-                  onClick={() => run(() => cancelClientSubscription(activeSubscriptionId, 'Cancelado pelo admin').then(() => { window.location.reload() }))}
+                  onClick={() => run(() => cancelClientSubscription(activeSubscriptionId, 'Cancelado pelo admin').then(() => { router.refresh() }))}
                   disabled={isPending}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm hover:bg-red-950/20 text-red-400 transition-colors text-left"
                 >
@@ -85,7 +87,7 @@ export function ClientDetailActions({
               <div className="border-t border-moria-border my-1" />
 
               <button
-                onClick={() => run(() => toggleClientActive(clientId, !isActive).then(() => { window.location.reload() }))}
+                onClick={() => run(() => toggleClientActive(clientId, !isActive).then(() => { router.refresh() }))}
                 disabled={isPending}
                 className={cn(
                   'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left',
@@ -116,7 +118,7 @@ export function ClientDetailActions({
           <div className="flex gap-3 mt-4">
             <button onClick={() => setOpen(null)} className="flex-1 py-2 rounded-lg border border-moria-border text-sm">Cancelar</button>
             <button
-              onClick={() => run(() => updateClientNotes(clientId, notesValue).then(() => { window.location.reload() }))}
+              onClick={() => run(() => updateClientNotes(clientId, notesValue).then(() => { router.refresh() }))}
               disabled={isPending}
               className="flex-1 py-2 rounded-lg bg-gold-gradient text-black font-bold text-sm hover:opacity-90 disabled:opacity-60"
             >
@@ -148,7 +150,7 @@ export function ClientDetailActions({
           <div className="flex gap-3 mt-4">
             <button onClick={() => setOpen(null)} className="flex-1 py-2 rounded-lg border border-moria-border text-sm">Cancelar</button>
             <button
-              onClick={() => run(() => grantManualSubscription(clientId, selectedPlan, 30).then(() => { window.location.reload() }))}
+              onClick={() => run(() => grantManualSubscription(clientId, selectedPlan, 30).then(() => { router.refresh() }))}
               disabled={isPending || !selectedPlan}
               className="flex-1 py-2 rounded-lg bg-gold-gradient text-black font-bold text-sm hover:opacity-90 disabled:opacity-60"
             >

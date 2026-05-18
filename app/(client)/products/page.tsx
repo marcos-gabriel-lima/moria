@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/supabase/server'
+import { getProductsCache } from '@/lib/queries'
 import { redirect } from 'next/navigation'
 import { ShoppingBag, Package } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
@@ -6,15 +7,10 @@ import { formatCurrency } from '@/lib/utils'
 export const metadata = { title: 'Produtos' }
 
 export default async function ProductsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
 
-  const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('is_active', true)
-    .order('name')
+  const products = await getProductsCache()
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

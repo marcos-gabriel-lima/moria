@@ -21,7 +21,7 @@ const signInSchema = z.object({
 
 export async function signUp(
   formData: z.infer<typeof signUpSchema>
-): Promise<ActionResult> {
+): Promise<ActionResult<{ session: boolean }>> {
   const supabase = await createClient()
 
   const parsed = signUpSchema.safeParse(formData)
@@ -31,7 +31,7 @@ export async function signUp(
 
   const { full_name, email, phone, whatsapp, password } = parsed.data
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -47,12 +47,12 @@ export async function signUp(
     return { success: false, error: 'Erro ao criar conta. Tente novamente.' }
   }
 
-  return { success: true, data: undefined }
+  return { success: true, data: { session: !!data.session } }
 }
 
 export async function signIn(
   formData: z.infer<typeof signInSchema>
-): Promise<ActionResult> {
+): Promise<ActionResult<{ role: string }>> {
   const supabase = await createClient()
 
   const parsed = signInSchema.safeParse(formData)
@@ -60,7 +60,7 @@ export async function signIn(
     return { success: false, error: parsed.error.errors[0].message }
   }
 
-  const { error } = await supabase.auth.signInWithPassword(parsed.data)
+  const { data: authData, error } = await supabase.auth.signInWithPassword(parsed.data)
 
   if (error) {
     if (error.message.includes('Invalid login')) {
@@ -69,8 +69,14 @@ export async function signIn(
     return { success: false, error: 'Erro ao fazer login' }
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', authData.user.id)
+    .single()
+
   revalidatePath('/', 'layout')
-  return { success: true, data: undefined }
+  return { success: true, data: { role: profile?.role ?? 'client' } }
 }
 
 export async function signInWithMagicLink(email: string): Promise<ActionResult> {
@@ -108,17 +114,27 @@ export async function getProfile() {
   return data
 }
 
+const updateProfileSchema = z.object({
+  full_name:  z.string().min(3).optional(),
+  phone:      z.string().min(10).optional(),
+  whatsapp:   z.string().min(10).optional(),
+  avatar_url: z.string().url().optional(),
+})
+
 export async function updateProfile(
-  data: Partial<{ full_name: string; phone: string; whatsapp: string; avatar_url: string }>
+  data: z.infer<typeof updateProfileSchema>
 ): Promise<ActionResult> {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Não autenticado' }
 
+  const parsed = updateProfileSchema.safeParse(data)
+  if (!parsed.success) return { success: false, error: parsed.error.errors[0].message }
+
   const { error } = await supabase
     .from('profiles')
-    .update(data)
+    .update(parsed.data)
     .eq('id', user.id)
 
   if (error) return { success: false, error: 'Erro ao atualizar perfil' }

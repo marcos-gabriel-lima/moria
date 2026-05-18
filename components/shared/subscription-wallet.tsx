@@ -10,10 +10,9 @@ import QRCode from 'qrcode'
 
 interface SubscriptionWalletProps {
   subscription: Subscription
-  onCancel?: () => void
 }
 
-export function SubscriptionWallet({ subscription, onCancel }: SubscriptionWalletProps) {
+export function SubscriptionWallet({ subscription }: SubscriptionWalletProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
   const plan = subscription.plan!
   const isActive = subscription.status === 'active'
@@ -119,14 +118,6 @@ export function SubscriptionWallet({ subscription, onCancel }: SubscriptionWalle
               </div>
             )}
 
-            {isActive && (
-              <button
-                onClick={onCancel}
-                className="text-xs text-muted-foreground hover:text-red-400 transition-colors underline underline-offset-2"
-              >
-                Cancelar assinatura
-              </button>
-            )}
           </div>
 
           {/* QR Code */}

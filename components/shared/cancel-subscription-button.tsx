@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { XCircle } from 'lucide-react'
 import { cancelSubscription } from '@/actions/subscriptions'
 
 export function CancelSubscriptionButton({ subscriptionId }: { subscriptionId: string }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
@@ -14,7 +16,7 @@ export function CancelSubscriptionButton({ subscriptionId }: { subscriptionId: s
     startTransition(async () => {
       const result = await cancelSubscription(subscriptionId, 'Cancelado pelo cliente')
       if (!result.success) { setError(result.error); return }
-      window.location.reload()
+      router.refresh()
     })
   }
 

@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { addMinutes } from 'date-fns'
 import type { ActionResult, Appointment } from '@/types'
 import { z } from 'zod'
@@ -30,29 +30,23 @@ export async function createAppointment(
 
   const { barber_id, service_ids, scheduled_at, notes } = parsed.data
 
-  // Buscar serviços selecionados
-  const { data: services, error: servicesError } = await supabase
-    .from('services')
-    .select('*')
-    .in('id', service_ids)
-    .eq('is_active', true)
+  const [{ data: services, error: servicesError }, { data: subscription }] = await Promise.all([
+    supabase.from('services').select('*').in('id', service_ids).eq('is_active', true),
+    supabase
+      .from('subscriptions')
+      .select('*, plan:plans(*)')
+      .eq('client_id', user.id)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle(),
+  ])
 
   if (servicesError || !services?.length) {
     return { success: false, error: 'Serviços inválidos' }
   }
 
-  // Calcular duração e preço total
   const totalDuration = services.reduce((sum, s) => sum + s.duration_minutes, 0)
   const totalPrice = services.reduce((sum, s) => sum + s.price, 0)
-
-  // Verificar assinatura ativa do cliente
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('*, plan:plans(*)')
-    .eq('client_id', user.id)
-    .eq('status', 'active')
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle()
 
   // Calcular preço real considerando plano
   let actualPrice = 0
@@ -122,6 +116,7 @@ export async function createAppointment(
   revalidatePath('/appointments')
   revalidatePath('/barber/schedule')
   revalidatePath('/admin/dashboard')
+  updateTag('admin-kpis')
 
   return { success: true, data: appointment as Appointment }
 }
@@ -130,25 +125,21 @@ export async function cancelAppointment(
   appointmentId: string,
   reason?: string
 ): Promise<ActionResult> {
+  if (!z.string().uuid().safeParse(appointmentId).success) {
+    return { success: false, error: 'ID de agendamento inválido' }
+  }
+
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Não autenticado' }
 
-  const { data: apt } = await supabase
-    .from('appointments')
-    .select('client_id, status, scheduled_at')
-    .eq('id', appointmentId)
-    .single()
+  const [{ data: apt }, { data: profile }] = await Promise.all([
+    supabase.from('appointments').select('client_id, status, scheduled_at').eq('id', appointmentId).single(),
+    supabase.from('profiles').select('role').eq('id', user.id).single(),
+  ])
 
   if (!apt) return { success: false, error: 'Agendamento não encontrado' }
-
-  // Só o próprio cliente ou admin pode cancelar
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
 
   if (apt.client_id !== user.id && profile?.role !== 'admin') {
     return { success: false, error: 'Sem permissão para cancelar este agendamento' }
@@ -171,6 +162,7 @@ export async function cancelAppointment(
 
   revalidatePath('/appointments')
   revalidatePath('/barber/schedule')
+  updateTag('admin-kpis')
 
   return { success: true, data: undefined }
 }
@@ -178,24 +170,32 @@ export async function cancelAppointment(
 export async function completeAppointment(
   appointmentId: string
 ): Promise<ActionResult> {
+  if (!z.string().uuid().safeParse(appointmentId).success) {
+    return { success: false, error: 'ID de agendamento inválido' }
+  }
+
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Não autenticado' }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('appointments')
     .update({
       status: 'completed',
       completed_at: new Date().toISOString(),
     })
     .eq('id', appointmentId)
-    .in('barber_id', [user.id]) // Só o barbeiro responsável
+    .eq('barber_id', user.id)
+    .select('id')
+    .single()
 
-  if (error) return { success: false, error: 'Erro ao concluir agendamento' }
+  if (error || !data) return { success: false, error: 'Agendamento não encontrado ou sem permissão' }
 
   revalidatePath('/barber/schedule')
   revalidatePath('/admin/dashboard')
+  updateTag('admin-kpis')
+  updateTag('admin-reports')
 
   return { success: true, data: undefined }
 }
@@ -203,11 +203,11 @@ export async function completeAppointment(
 export async function getAvailableSlots(
   barberId: string,
   date: string
-): Promise<ActionResult<{ slots: string[]; blocked: string[] }>> {
+): Promise<ActionResult<{ slots: string[]; blocked: { starts_at: string; ends_at: string }[] }>> {
   const supabase = await createClient()
 
-  const dayStart = `${date}T00:00:00.000Z`
-  const dayEnd = `${date}T23:59:59.999Z`
+  const dayStart = `${date}T00:00:00`
+  const dayEnd = `${date}T23:59:59`
 
   const [{ data: appointments }, { data: blocked }] = await Promise.all([
     supabase
@@ -230,7 +230,7 @@ export async function getAvailableSlots(
     success: true,
     data: {
       slots: (appointments ?? []).map(a => a.scheduled_at),
-      blocked: (blocked ?? []).flatMap(b => [b.starts_at, b.ends_at]),
+      blocked: (blocked ?? []).map(b => ({ starts_at: b.starts_at, ends_at: b.ends_at })),
     },
   }
 }

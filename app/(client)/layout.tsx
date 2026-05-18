@@ -1,23 +1,15 @@
 import { redirect } from 'next/navigation'
-import { LayoutDashboard, Calendar, Crown, Wallet, ShoppingBag, LogOut, User } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
+import { LogOut, User } from 'lucide-react'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { Logo } from '@/components/shared/logo'
 import { ClientNav } from '@/components/shared/client-nav'
 import { signOut } from '@/actions/auth'
 
-const navItems = [
-  { href: '/dashboard',    icon: LayoutDashboard, label: 'Início'       },
-  { href: '/appointments', icon: Calendar,         label: 'Agendamentos' },
-  { href: '/plans',        icon: Crown,            label: 'Planos'       },
-  { href: '/wallet',       icon: Wallet,           label: 'Carteira'     },
-  { href: '/products',     icon: ShoppingBag,      label: 'Produtos'     },
-]
-
 export default async function ClientLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
 
+  const supabase = await createClient()
   const { data: profile } = await supabase
     .from('profiles')
     .select('full_name, avatar_url, role')
@@ -33,7 +25,7 @@ export default async function ClientLayout({ children }: { children: React.React
         </div>
 
         <nav className="flex-1 p-4 space-y-0.5">
-          <ClientNav items={navItems} />
+          <ClientNav />
         </nav>
 
         <div className="p-4 border-t border-moria-border space-y-1">
@@ -87,7 +79,7 @@ export default async function ClientLayout({ children }: { children: React.React
         {/* Bottom nav mobile */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-moria-border bg-moria-surface/95 backdrop-blur-md">
           <div className="flex items-center justify-around h-16 px-2">
-            <ClientNav items={navItems} mobile />
+            <ClientNav mobile />
           </div>
         </nav>
       </div>

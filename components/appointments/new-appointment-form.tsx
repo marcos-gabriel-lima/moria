@@ -36,10 +36,10 @@ export function NewAppointmentForm({ barbers, services, subscription }: NewAppoi
     const dateStr = format(selectedSlot, 'yyyy-MM-dd')
     getAvailableSlots(selectedBarber.id, dateStr).then(res => {
       if (res.success) {
-        // Montar objetos mínimos para o calendário
         setAppointments(
           res.data.slots.map(s => ({ scheduled_at: s, duration_minutes: 30 } as Appointment))
         )
+        setBlockedSlots(res.data.blocked)
       }
     })
   }, [selectedBarber, selectedSlot])

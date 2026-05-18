@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Crown, ChevronRight } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
 import { SubscriptionWallet } from '@/components/shared/subscription-wallet'
 import { CancelSubscriptionButton } from '@/components/shared/cancel-subscription-button'
 import type { Subscription } from '@/types'
@@ -9,9 +9,9 @@ import type { Subscription } from '@/types'
 export const metadata = { title: 'Carteira' }
 
 export default async function WalletPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
+  const supabase = await createClient()
 
   const { data: subscription } = await supabase
     .from('subscriptions')

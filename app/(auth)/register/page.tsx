@@ -39,7 +39,12 @@ export default function RegisterPage() {
     startTransition(async () => {
       const result = await signUp(data)
       if (!result.success) { setError(result.error); return }
-      setSuccess(true)
+      if (result.data?.session) {
+        router.refresh()
+        router.push('/dashboard')
+      } else {
+        setSuccess(true)
+      }
     })
   }
 

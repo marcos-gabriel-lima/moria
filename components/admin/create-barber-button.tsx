@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, X } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -41,6 +42,7 @@ const DAYS = [
 ]
 
 export function CreateBarberButton() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState('')
@@ -67,7 +69,7 @@ export function CreateBarberButton() {
       if (!result.success) { setServerError(result.error); return }
       reset()
       setOpen(false)
-      window.location.reload()
+      router.refresh()
     })
   }
 

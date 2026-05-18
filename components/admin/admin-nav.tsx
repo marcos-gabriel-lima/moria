@@ -2,27 +2,25 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { LayoutDashboard, Users, Scissors, Crown, BarChart3, ShoppingBag } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { LucideIcon } from 'lucide-react'
 
-interface NavItem {
-  href: string
-  icon: LucideIcon
-  label: string
-}
+const navItems = [
+  { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard'  },
+  { href: '/admin/clients',   icon: Users,           label: 'Clientes'   },
+  { href: '/admin/barbers',   icon: Scissors,        label: 'Barbeiros'  },
+  { href: '/admin/plans',     icon: Crown,           label: 'Planos'     },
+  { href: '/admin/products',  icon: ShoppingBag,     label: 'Produtos'   },
+  { href: '/admin/reports',   icon: BarChart3,       label: 'Relatórios' },
+]
 
-interface AdminNavProps {
-  items: NavItem[]
-  mobile?: boolean
-}
-
-export function AdminNav({ items, mobile }: AdminNavProps) {
+export function AdminNav({ mobile }: { mobile?: boolean }) {
   const pathname = usePathname()
 
   if (mobile) {
     return (
       <>
-        {items.map(({ href, icon: Icon, label }) => {
+        {navItems.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(href))
           return (
             <Link
@@ -30,9 +28,7 @@ export function AdminNav({ items, mobile }: AdminNavProps) {
               href={href}
               className={cn(
                 'flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors',
-                isActive
-                  ? 'text-gold-DEFAULT'
-                  : 'text-muted-foreground hover:text-foreground'
+                isActive ? 'text-gold-DEFAULT' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <Icon className="w-5 h-5" />
@@ -46,7 +42,7 @@ export function AdminNav({ items, mobile }: AdminNavProps) {
 
   return (
     <>
-      {items.map(({ href, icon: Icon, label }) => {
+      {navItems.map(({ href, icon: Icon, label }) => {
         const isActive = pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(href))
         return (
           <Link

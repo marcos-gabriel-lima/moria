@@ -4,15 +4,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Demo routes and landing page don't need Supabase auth
-  if (pathname.startsWith('/demo')) {
-    return NextResponse.next({ request })
-  }
-
-  // Bypass if Supabase is not configured (e.g., demo deployment)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
-  if (!supabaseUrl || supabaseUrl.includes('xxxx') || !supabaseKey || supabaseKey.length < 20) {
+
+  // Bypass only in non-production when Supabase is not configured (e.g. CI, local demo)
+  if (process.env.NODE_ENV !== 'production' && (!supabaseUrl || !supabaseKey || supabaseKey.length < 20)) {
     return NextResponse.next({ request })
   }
 
@@ -51,22 +47,31 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse
   }
 
-  if (authRoutes.some(r => pathname.startsWith(r))) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
+  const needsRoleCheck =
+    authRoutes.some(r => pathname.startsWith(r)) ||
+    adminRoutes.some(r => pathname.startsWith(r)) ||
+    barberRoutes.some(r => pathname.startsWith(r))
 
-  if (adminRoutes.some(r => pathname.startsWith(r)) || barberRoutes.some(r => pathname.startsWith(r))) {
+  if (needsRoleCheck) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (adminRoutes.some(r => pathname.startsWith(r)) && profile?.role !== 'admin') {
+    const role = profile?.role ?? 'client'
+
+    if (authRoutes.some(r => pathname.startsWith(r))) {
+      if (role === 'admin') return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+      if (role === 'barber') return NextResponse.redirect(new URL('/barber/schedule', request.url))
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    if (barberRoutes.some(r => pathname.startsWith(r)) && !['barber', 'admin'].includes(profile?.role ?? '')) {
+    if (adminRoutes.some(r => pathname.startsWith(r)) && role !== 'admin') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
+    if (barberRoutes.some(r => pathname.startsWith(r)) && !['barber', 'admin'].includes(role)) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }

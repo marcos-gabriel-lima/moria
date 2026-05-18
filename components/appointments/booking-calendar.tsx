@@ -49,7 +49,7 @@ export function BookingCalendar({
 
   const prevDay = () => {
     const prev = addDays(currentDate, -1)
-    if (!isSameDay(prev, minDate) && prev >= minDate) setCurrentDate(prev)
+    if (prev >= minDate) setCurrentDate(prev)
   }
 
   const nextDay = () => {

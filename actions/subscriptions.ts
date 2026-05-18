@@ -1,14 +1,13 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, updateTag } from 'next/cache'
 import { addMonths } from 'date-fns'
 import type { ActionResult, Subscription } from '@/types'
 import { z } from 'zod'
 
 const subscribeSchema = z.object({
   plan_id: z.string().uuid(),
-  payment_method: z.enum(['pix', 'credit_card']),
 })
 
 export async function subscribeToPlan(
@@ -24,9 +23,8 @@ export async function subscribeToPlan(
     return { success: false, error: parsed.error.errors[0].message }
   }
 
-  const { plan_id, payment_method } = parsed.data
+  const { plan_id } = parsed.data
 
-  // Verificar se o plano existe e está ativo
   const { data: plan } = await supabase
     .from('plans')
     .select('*')
@@ -36,7 +34,6 @@ export async function subscribeToPlan(
 
   if (!plan) return { success: false, error: 'Plano não encontrado' }
 
-  // Criar assinatura (o trigger cancela automaticamente qualquer ativa existente)
   const now = new Date()
   const expiresAt = addMonths(now, 1)
 
@@ -45,10 +42,9 @@ export async function subscribeToPlan(
     .insert({
       client_id: user.id,
       plan_id,
-      status: payment_method === 'pix' ? 'pending' : 'active', // Pix aguarda confirmação
-      started_at: payment_method === 'credit_card' ? now.toISOString() : null,
-      expires_at: payment_method === 'credit_card' ? expiresAt.toISOString() : null,
-      payment_method,
+      status: 'active',
+      started_at: now.toISOString(),
+      expires_at: expiresAt.toISOString(),
       auto_renew: true,
     })
     .select('*, plan:plans(*)')
@@ -56,19 +52,11 @@ export async function subscribeToPlan(
 
   if (error) return { success: false, error: 'Erro ao criar assinatura' }
 
-  // Criar registro de pagamento
-  await supabase.from('payments').insert({
-    client_id: user.id,
-    subscription_id: subscription.id,
-    amount: plan.price,
-    method: payment_method,
-    status: payment_method === 'credit_card' ? 'paid' : 'pending',
-    paid_at: payment_method === 'credit_card' ? now.toISOString() : null,
-  })
-
   revalidatePath('/plans')
   revalidatePath('/wallet')
   revalidatePath('/dashboard')
+  updateTag('admin-kpis')
+  updateTag('admin-recent-subs')
 
   return { success: true, data: subscription as Subscription }
 }
@@ -77,6 +65,10 @@ export async function cancelSubscription(
   subscriptionId: string,
   reason?: string
 ): Promise<ActionResult> {
+  if (!z.string().uuid().safeParse(subscriptionId).success) {
+    return { success: false, error: 'ID de assinatura inválido' }
+  }
+
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -106,6 +98,8 @@ export async function cancelSubscription(
 
   revalidatePath('/wallet')
   revalidatePath('/plans')
+  updateTag('admin-kpis')
+  updateTag('admin-recent-subs')
 
   return { success: true, data: undefined }
 }

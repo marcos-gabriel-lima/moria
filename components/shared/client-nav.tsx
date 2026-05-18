@@ -2,27 +2,24 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { LayoutDashboard, Calendar, Crown, Wallet, ShoppingBag } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { LucideIcon } from 'lucide-react'
 
-interface NavItem {
-  href: string
-  icon: LucideIcon
-  label: string
-}
+const navItems = [
+  { href: '/dashboard',    icon: LayoutDashboard, label: 'Início'       },
+  { href: '/appointments', icon: Calendar,         label: 'Agendamentos' },
+  { href: '/plans',        icon: Crown,            label: 'Planos'       },
+  { href: '/wallet',       icon: Wallet,           label: 'Carteira'     },
+  { href: '/products',     icon: ShoppingBag,      label: 'Produtos'     },
+]
 
-interface ClientNavProps {
-  items: NavItem[]
-  mobile?: boolean
-}
-
-export function ClientNav({ items, mobile }: ClientNavProps) {
+export function ClientNav({ mobile }: { mobile?: boolean }) {
   const pathname = usePathname()
 
   if (mobile) {
     return (
       <>
-        {items.map(({ href, icon: Icon, label }) => {
+        {navItems.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
           return (
             <Link
@@ -44,7 +41,7 @@ export function ClientNav({ items, mobile }: ClientNavProps) {
 
   return (
     <>
-      {items.map(({ href, icon: Icon, label }) => {
+      {navItems.map(({ href, icon: Icon, label }) => {
         const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
         return (
           <Link

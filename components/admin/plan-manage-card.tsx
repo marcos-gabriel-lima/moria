@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Crown, Users, Edit2, Check, X, Plus, Minus } from 'lucide-react'
 import { togglePlanActive, updatePlan } from '@/actions/admin'
 import { ToggleSwitch } from './toggle-switch'
@@ -13,6 +14,7 @@ interface PlanManageCardProps {
 }
 
 export function PlanManageCard({ plan, activeSubscribers }: PlanManageCardProps) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [editing, setEditing] = useState(false)
   const [error, setError] = useState('')
@@ -37,7 +39,7 @@ export function PlanManageCard({ plan, activeSubscribers }: PlanManageCardProps)
       })
       if (!result.success) { setError(result.error); return }
       setEditing(false)
-      window.location.reload()
+      router.refresh()
     })
   }
 
@@ -182,7 +184,7 @@ export function PlanManageCard({ plan, activeSubscribers }: PlanManageCardProps)
         </div>
         <ToggleSwitch
           checked={plan.is_active}
-          onToggle={(v) => togglePlanActive(plan.id, v).then(() => window.location.reload())}
+          onToggle={(v) => togglePlanActive(plan.id, v).then(() => router.refresh())}
           label={plan.is_active ? 'Ativo' : 'Inativo'}
           size="sm"
         />

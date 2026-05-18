@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, X } from 'lucide-react'
 import { upsertService } from '@/actions/admin'
 
@@ -13,6 +14,7 @@ const CATEGORIES = [
 ] as const
 
 export function CreateServiceButton() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState('')
@@ -38,7 +40,7 @@ export function CreateServiceButton() {
       })
       if (!result.success) { setError(result.error); return }
       setOpen(false)
-      window.location.reload()
+      router.refresh()
     })
   }
 

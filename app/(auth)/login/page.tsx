@@ -37,7 +37,11 @@ export default function LoginPage() {
         setError(result.error)
         return
       }
-      router.push('/dashboard')
+      router.refresh()
+      const role = result.data?.role
+      if (role === 'admin') router.push('/admin/dashboard')
+      else if (role === 'barber') router.push('/barber/schedule')
+      else router.push('/dashboard')
     })
   }
 

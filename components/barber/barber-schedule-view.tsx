@@ -3,21 +3,29 @@
 import { useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format, addDays, subDays } from 'date-fns'
-import { ChevronLeft, ChevronRight, Clock, User, Check, MessageCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, User, Check, MessageCircle, Ban, Trash2 } from 'lucide-react'
 import { cn, formatCurrency, getWhatsAppUrl } from '@/lib/utils'
 import { SubscriberBadge } from '@/components/shared/subscriber-badge'
 import { completeAppointment } from '@/actions/appointments'
-import type { Appointment } from '@/types'
+import { deleteBlockedSlot } from '@/actions/barber'
+import { BlockSlotButton } from './block-slot-button'
+import type { Appointment, BlockedSlot } from '@/types'
 
 interface BarberScheduleViewProps {
-  appointments: Appointment[]
-  currentDate: string
-  barberId: string
+  appointments:  Appointment[]
+  blockedSlots:  BlockedSlot[]
+  currentDate:   string
+  barberId:      string
 }
 
-export function BarberScheduleView({ appointments, currentDate, barberId }: BarberScheduleViewProps) {
+type TimelineItem =
+  | { kind: 'appointment'; data: Appointment; time: string }
+  | { kind: 'blocked';     data: BlockedSlot;  time: string }
+
+export function BarberScheduleView({ appointments, blockedSlots, currentDate, barberId }: BarberScheduleViewProps) {
   const router = useRouter()
   const [completing, setCompleting] = useState<string | null>(null)
+  const [deleting,   setDeleting]   = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const navigate = (direction: 'prev' | 'next') => {
@@ -35,8 +43,23 @@ export function BarberScheduleView({ appointments, currentDate, barberId }: Barb
     })
   }
 
+  const handleDeleteBlock = (slotId: string) => {
+    startTransition(async () => {
+      setDeleting(slotId)
+      await deleteBlockedSlot(slotId)
+      setDeleting(null)
+      router.refresh()
+    })
+  }
+
+  // Merge appointments + blocked slots sorted by time
+  const timeline: TimelineItem[] = [
+    ...appointments.map(a => ({ kind: 'appointment' as const, data: a, time: a.scheduled_at })),
+    ...blockedSlots.map(b => ({ kind: 'blocked' as const,     data: b, time: b.starts_at     })),
+  ].sort((a, b) => a.time.localeCompare(b.time))
+
   const active = appointments.filter(a => a.status !== 'completed')
-  const done = appointments.filter(a => a.status === 'completed')
+  const done   = appointments.filter(a => a.status === 'completed')
 
   return (
     <div className="space-y-5">
@@ -47,30 +70,67 @@ export function BarberScheduleView({ appointments, currentDate, barberId }: Barb
         </button>
         <div className="text-center">
           <p className="font-bold">{active.length} agendamento{active.length !== 1 ? 's' : ''}</p>
-          <p className="text-xs text-muted-foreground">{done.length} concluídos</p>
+          <p className="text-xs text-muted-foreground">
+            {done.length} concluídos
+            {blockedSlots.length > 0 && ` · ${blockedSlots.length} bloqueio${blockedSlots.length !== 1 ? 's' : ''}`}
+          </p>
         </div>
         <button onClick={() => navigate('next')} className="p-2 rounded-md hover:bg-moria-elevated transition-colors">
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Lista */}
-      {active.length === 0 && done.length === 0 && (
+      {/* Botão bloquear horário */}
+      <div className="flex justify-end">
+        <BlockSlotButton currentDate={currentDate} onSuccess={() => router.refresh()} />
+      </div>
+
+      {timeline.length === 0 && (
         <div className="text-center py-16 text-muted-foreground text-sm">
-          Nenhum agendamento neste dia
+          Nenhum agendamento ou bloqueio neste dia
         </div>
       )}
 
       <div className="space-y-3">
-        {appointments.map(apt => {
-          const client = apt.client as any
-          const sub = apt.subscription as any
-          const planName = sub?.plan?.name
+        {timeline.map(item => {
+          if (item.kind === 'blocked') {
+            const slot = item.data as BlockedSlot
+            return (
+              <div
+                key={`block-${slot.id}`}
+                className="rounded-xl border border-red-800/30 bg-red-950/20 p-4 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <Ban className="w-4 h-4 text-red-400 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-red-300">
+                      {format(new Date(slot.starts_at), 'HH:mm')} – {format(new Date(slot.ends_at), 'HH:mm')}
+                    </p>
+                    {slot.reason && (
+                      <p className="text-xs text-muted-foreground">{slot.reason}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDeleteBlock(slot.id)}
+                  disabled={deleting === slot.id}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-950/40 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            )
+          }
+
+          const apt        = item.data as Appointment
+          const client     = apt.client as any
+          const sub        = apt.subscription as any
+          const planName   = sub?.plan?.name
           const isCompleted = apt.status === 'completed'
 
           return (
             <div
-              key={apt.id}
+              key={`apt-${apt.id}`}
               className={cn(
                 'rounded-xl border p-4 space-y-3 transition-all',
                 apt.is_subscriber

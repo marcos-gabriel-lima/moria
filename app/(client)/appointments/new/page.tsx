@@ -1,25 +1,19 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
+import { getActiveBarbersCache, getServicesCache } from '@/lib/queries'
 import { NewAppointmentForm } from '@/components/appointments/new-appointment-form'
 import type { Barber, Service, Subscription } from '@/types'
 
 export const metadata = { title: 'Novo Agendamento' }
 
 export default async function NewAppointmentPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
+  const supabase = await createClient()
 
-  const [{ data: barbers }, { data: services }, { data: subscription }] = await Promise.all([
-    supabase
-      .from('barbers')
-      .select('*, profile:profiles(id, full_name, avatar_url)')
-      .eq('is_active', true),
-    supabase
-      .from('services')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order'),
+  const [barbers, services, { data: subscription }] = await Promise.all([
+    getActiveBarbersCache(),
+    getServicesCache(),
     supabase
       .from('subscriptions')
       .select('*, plan:plans(*)')
@@ -41,8 +35,8 @@ export default async function NewAppointmentPage() {
       </div>
 
       <NewAppointmentForm
-        barbers={(barbers ?? []) as unknown as (Barber & { profile: { id: string; full_name: string; avatar_url: string | null } })[]}
-        services={(services ?? []) as Service[]}
+        barbers={barbers as unknown as (Barber & { profile: { id: string; full_name: string; avatar_url: string | null } })[]}
+        services={services as Service[]}
         subscription={(subscription ?? null) as unknown as Subscription | null}
       />
     </div>

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getUser } from '@/lib/supabase/server'
+import { getPlansCache } from '@/lib/queries'
 import { PlanCard } from '@/components/plans/plan-card'
 import { PlanSubscribeButton } from '@/components/plans/plan-subscribe-button'
 import { Shield, Clock, Crown } from 'lucide-react'
@@ -7,12 +8,12 @@ import { Shield, Clock, Crown } from 'lucide-react'
 export const metadata = { title: 'Planos' }
 
 export default async function PlansPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) redirect('/login')
+  const supabase = await createClient()
 
-  const [{ data: plans }, { data: activeSubscription }] = await Promise.all([
-    supabase.from('plans').select('*').eq('is_active', true).order('display_order'),
+  const [plans, { data: activeSubscription }] = await Promise.all([
+    getPlansCache(),
     supabase
       .from('subscriptions')
       .select('*, plan:plans(*)')
@@ -52,7 +53,7 @@ export default async function PlansPage() {
 
       {/* Cards de planos */}
       <div className="grid sm:grid-cols-3 gap-6">
-        {plans?.map(plan => (
+        {plans.map(plan => (
           <PlanSubscribeButton
             key={plan.id}
             plan={plan as any}

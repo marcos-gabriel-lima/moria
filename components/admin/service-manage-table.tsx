@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Check, Scissors } from 'lucide-react'
 import { toggleServiceActive } from '@/actions/admin'
 import { ToggleSwitch } from './toggle-switch'
@@ -49,7 +49,7 @@ export function ServiceManageTable({ services }: ServiceManageTableProps) {
 }
 
 function ServiceRow({ service: svc }: { service: Service }) {
-  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
   return (
     <tr className={cn(
@@ -94,7 +94,7 @@ function ServiceRow({ service: svc }: { service: Service }) {
       <td className="p-4">
         <ToggleSwitch
           checked={svc.is_active}
-          onToggle={(v) => toggleServiceActive(svc.id, v).then(() => window.location.reload())}
+          onToggle={(v) => toggleServiceActive(svc.id, v).then(() => router.refresh())}
           size="sm"
         />
       </td>
