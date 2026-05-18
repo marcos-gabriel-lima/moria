@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Package, Edit2, Check, X, Plus, Minus } from 'lucide-react'
-import { toggleProductActive, updateProduct, adjustStock } from '@/actions/admin'
+import { Package, Edit2, Check, X, Plus, Minus, Upload } from 'lucide-react'
+import { toggleProductActive, updateProduct, adjustStock, uploadProductImage } from '@/actions/admin'
 import { ToggleSwitch } from './toggle-switch'
 import { cn, formatCurrency } from '@/lib/utils'
 
@@ -14,54 +14,107 @@ interface Product {
   price: number
   stock: number
   image_url: string | null
-  category: string | null
   is_active: boolean
 }
 
 export function ProductManageCard({ product }: { product: Product }) {
   const router = useRouter()
-  const [isPending, startTransition] = useTransition()
+  const [isPending, start] = useTransition()
   const [editing, setEditing]     = useState(false)
   const [error, setError]         = useState('')
   const [name,        setName]        = useState(product.name)
   const [description, setDescription] = useState(product.description ?? '')
   const [price,       setPrice]       = useState(String(product.price))
-  const [category,    setCategory]    = useState(product.category ?? '')
-  const [imageUrl,    setImageUrl]    = useState(product.image_url ?? '')
+  const [imgPreview,  setImgPreview]  = useState<string | null>(null)
+  const [imgFile,     setImgFile]     = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const inputCls = 'w-full px-3 py-2 rounded-lg bg-moria-elevated border border-moria-border text-sm focus:outline-none focus:ring-1 focus:ring-gold-DEFAULT/40 transition-all'
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImgFile(file)
+    setImgPreview(URL.createObjectURL(file))
+  }
+
   const handleSave = () => {
     setError('')
-    startTransition(async () => {
+    start(async () => {
+      // 1. Upload da imagem, se houver nova
+      if (imgFile) {
+        const fd = new FormData()
+        fd.set('image', imgFile)
+        const imgResult = await uploadProductImage(product.id, fd)
+        if (!imgResult.success) { setError(imgResult.error); return }
+      }
+
+      // 2. Salva campos de texto
       const result = await updateProduct(product.id, {
         name,
         description: description || undefined,
         price: parseFloat(price),
-        category: category || undefined,
-        image_url: imageUrl || undefined,
       })
       if (!result.success) { setError(result.error); return }
+
       setEditing(false)
+      setImgFile(null)
       router.refresh()
     })
   }
 
   const handleStock = (delta: number) => {
-    startTransition(async () => {
+    start(async () => {
       await adjustStock(product.id, delta)
       router.refresh()
     })
   }
+
+  const currentImage = imgPreview ?? product.image_url
 
   if (editing) {
     return (
       <div className="rounded-xl border border-gold-DEFAULT/40 bg-moria-surface p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-sm">Editando produto</h3>
-          <button onClick={() => setEditing(false)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => { setEditing(false); setImgFile(null); setImgPreview(null) }} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
             <X className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Imagem */}
+        <div className="space-y-1.5">
+          <label className="text-xs text-muted-foreground">Foto do produto</label>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="w-full h-32 rounded-xl border-2 border-dashed border-moria-border hover:border-gold-DEFAULT/50 transition-colors overflow-hidden relative flex items-center justify-center bg-moria-elevated group"
+          >
+            {currentImage ? (
+              <>
+                <img src={currentImage} alt="" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5">
+                  <Upload className="w-4 h-4 text-white" />
+                  <span className="text-xs text-white">Trocar imagem</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <Upload className="w-5 h-5" />
+                <span className="text-xs">Adicionar foto</span>
+              </div>
+            )}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          {imgFile && (
+            <p className="text-[10px] text-gold-DEFAULT">✓ Nova imagem selecionada</p>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -69,23 +122,13 @@ export function ProductManageCard({ product }: { product: Product }) {
             <label className="text-xs text-muted-foreground">Nome *</label>
             <input value={name} onChange={e => setName(e.target.value)} className={inputCls} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Preço (R$) *</label>
-              <input value={price} onChange={e => setPrice(e.target.value)} type="number" step="0.01" className={inputCls} />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Categoria</label>
-              <input value={category} onChange={e => setCategory(e.target.value)} className={inputCls} placeholder="Ex: Pomadas" />
-            </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Preço (R$) *</label>
+            <input value={price} onChange={e => setPrice(e.target.value)} type="number" step="0.01" className={inputCls} />
           </div>
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Descrição</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className={`${inputCls} resize-none`} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">URL da imagem</label>
-            <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} className={inputCls} placeholder="https://..." />
           </div>
         </div>
 
@@ -119,12 +162,7 @@ export function ProductManageCard({ product }: { product: Product }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="font-bold text-sm leading-tight">{product.name}</h3>
-              {product.category && (
-                <span className="text-[10px] text-muted-foreground">{product.category}</span>
-              )}
-            </div>
+            <h3 className="font-bold text-sm leading-tight">{product.name}</h3>
             <button
               onClick={() => setEditing(true)}
               className="p-1.5 text-muted-foreground hover:text-gold-DEFAULT transition-colors shrink-0"

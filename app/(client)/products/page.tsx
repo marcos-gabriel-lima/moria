@@ -1,10 +1,18 @@
 import { getUser } from '@/lib/supabase/server'
 import { getProductsCache } from '@/lib/queries'
 import { redirect } from 'next/navigation'
-import { ShoppingBag, Package } from 'lucide-react'
+import { ShoppingBag, Package, MessageCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import Image from 'next/image'
 
 export const metadata = { title: 'Produtos' }
+
+const SHOP_WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '5511999999999'
+
+function productWhatsAppHref(productName: string) {
+  const msg = `Olá! Tenho interesse no produto: *${productName}*. Poderia me dar mais informações?`
+  return `https://wa.me/${SHOP_WHATSAPP}?text=${encodeURIComponent(msg)}`
+}
 
 export default async function ProductsPage() {
   const user = await getUser()
@@ -13,56 +21,68 @@ export default async function ProductsPage() {
   const products = await getProductsCache()
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-8">
+      {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gold-DEFAULT/10 border border-gold-DEFAULT/20 flex items-center justify-center">
           <ShoppingBag className="w-5 h-5 text-gold-DEFAULT" />
         </div>
         <div>
-          <h1 className="text-2xl font-black">Produtos</h1>
+          <h1 className="text-2xl font-black">Loja</h1>
           <p className="text-sm text-muted-foreground">Produtos exclusivos da MORIA</p>
         </div>
       </div>
 
-      {products && products.length > 0 ? (
-        <div className="grid sm:grid-cols-2 gap-4">
+      {products.length > 0 ? (
+        <div className="grid sm:grid-cols-2 gap-5">
           {products.map(product => (
-            <div key={product.id} className="rounded-xl border border-moria-border bg-moria-surface overflow-hidden hover:border-gold-DEFAULT/30 transition-colors group">
-              <div className="aspect-square bg-moria-elevated flex items-center justify-center">
+            <div
+              key={product.id}
+              className="rounded-2xl border border-moria-border bg-moria-surface overflow-hidden hover:border-gold-DEFAULT/30 transition-all duration-300 flex flex-col group"
+            >
+              {/* Imagem */}
+              <div className="relative aspect-[4/3] bg-moria-elevated overflow-hidden">
                 {product.image_url ? (
-                  <img
+                  <Image
                     src={product.image_url}
                     alt={product.name}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 ) : (
-                  <Package className="w-12 h-12 text-muted-foreground/30" />
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package className="w-14 h-14 text-muted-foreground/20" />
+                  </div>
                 )}
+                {/* Glow dourado no hover */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <div className="p-4 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-bold">{product.name}</h3>
-                  <span className="text-gold-DEFAULT font-black whitespace-nowrap">
+
+              {/* Info */}
+              <div className="p-5 flex flex-col gap-3 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-bold text-base leading-tight">{product.name}</h3>
+                  <span className="text-gold-DEFAULT font-black text-lg whitespace-nowrap shrink-0">
                     {formatCurrency(product.price)}
                   </span>
                 </div>
+
                 {product.description && (
-                  <p className="text-xs text-muted-foreground">{product.description}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                    {product.description}
+                  </p>
                 )}
-                <div className="flex items-center justify-between pt-1">
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${
-                    product.stock > 0
-                      ? 'text-green-400 bg-green-950/30 border-green-800/30'
-                      : 'text-red-400 bg-red-950/30 border-red-800/30'
-                  }`}>
-                    {product.stock > 0 ? `${product.stock} em estoque` : 'Esgotado'}
-                  </span>
-                  {product.stock > 0 && (
-                    <button className="text-xs bg-gold-gradient text-black font-bold px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity">
-                      Comprar
-                    </button>
-                  )}
-                </div>
+
+                {/* CTA WhatsApp */}
+                <a
+                  href={productWhatsAppHref(product.name)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-900/30 border border-green-800/40 text-green-400 font-semibold text-sm hover:bg-green-900/50 hover:border-green-700/60 transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Pedir pelo WhatsApp
+                </a>
               </div>
             </div>
           ))}
@@ -78,6 +98,15 @@ export default async function ProductsPage() {
               Nossos produtos exclusivos chegarão em breve. Fique ligado!
             </p>
           </div>
+          <a
+            href={`https://wa.me/${SHOP_WHATSAPP}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-green-400 hover:text-green-300 transition-colors"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Falar no WhatsApp
+          </a>
         </div>
       )}
     </div>

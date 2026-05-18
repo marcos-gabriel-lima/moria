@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { Crown, Shield, Clock, ChevronRight, Check, Scissors, Star, Instagram, MessageCircle } from 'lucide-react'
+import { Crown, Shield, Clock, ChevronRight, Check, Scissors, Star, Instagram, MessageCircle, Package, ShoppingBag } from 'lucide-react'
 import { Logo } from '@/components/shared/logo'
 import { FloatingCTA } from '@/components/shared/floating-cta'
 import { formatCurrency } from '@/lib/utils'
-import { getPlansCache, getActiveBarbersCache } from '@/lib/queries'
+import { getPlansCache, getActiveBarbersCache, getProductsCache } from '@/lib/queries'
 
 export const revalidate = 300 // revalida a cada 5 minutos (ISR)
 
@@ -12,9 +12,10 @@ const SHOP_WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '5511999999999'
 const whatsappHref  = `https://wa.me/${SHOP_WHATSAPP}?text=${encodeURIComponent('Olá! Gostaria de saber mais sobre a MORIA Barbearia.')}`
 
 export default async function LandingPage() {
-  const [plans, barbers] = await Promise.all([
+  const [plans, barbers, products] = await Promise.all([
     getPlansCache(),
     getActiveBarbersCache(),
+    getProductsCache(),
   ])
 
   return (
@@ -241,6 +242,86 @@ export default async function LandingPage() {
         </section>
       )}
 
+      {/* ── Produtos ────────────────────────────────────────────── */}
+      {products.length > 0 && (
+        <section className="py-24 border-t border-moria-border" id="produtos">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="text-center mb-14">
+              <p className="text-xs font-bold tracking-[0.3em] text-gold-DEFAULT uppercase mb-3">Nossa Loja</p>
+              <h2 className="text-3xl sm:text-4xl font-black">
+                Produtos{' '}
+                <span className="bg-gold-gradient bg-clip-text text-transparent">exclusivos</span>
+              </h2>
+              <p className="text-muted-foreground mt-3">Peça pelo WhatsApp e receba direto na barbearia</p>
+            </div>
+
+            <div className={`grid gap-6 ${products.length === 1 ? 'max-w-xs mx-auto' : products.length === 2 ? 'sm:grid-cols-2 max-w-2xl mx-auto' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+              {products.slice(0, 6).map((product: any) => {
+                const msg  = `Olá! Tenho interesse no produto: *${product.name}*. Poderia me dar mais informações?`
+                const href = `https://wa.me/${SHOP_WHATSAPP}?text=${encodeURIComponent(msg)}`
+                return (
+                  <div
+                    key={product.id}
+                    className="group flex flex-col rounded-2xl border border-moria-border bg-moria-surface overflow-hidden hover:border-gold-DEFAULT/30 transition-all duration-300"
+                  >
+                    {/* Imagem */}
+                    <div className="relative aspect-[4/3] bg-moria-elevated overflow-hidden">
+                      {product.image_url ? (
+                        <Image
+                          src={product.image_url}
+                          alt={product.name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-12 h-12 text-muted-foreground/20" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-5 flex flex-col gap-3 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-bold leading-tight">{product.name}</h3>
+                        <span className="text-gold-DEFAULT font-black whitespace-nowrap shrink-0">
+                          {formatCurrency(product.price)}
+                        </span>
+                      </div>
+                      {product.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
+                      )}
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-900/30 border border-green-800/40 text-green-400 font-semibold text-sm hover:bg-green-900/50 hover:border-green-700/60 transition-all"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Pedir pelo WhatsApp
+                      </a>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {products.length > 6 && (
+              <div className="text-center mt-10">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 text-sm text-gold-DEFAULT border border-gold-DEFAULT/30 px-6 py-3 rounded-xl hover:bg-gold-DEFAULT/10 transition-colors"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  Ver todos os produtos
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* ── Diferenciais ────────────────────────────────────────── */}
       <section className="py-24 border-t border-moria-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -447,6 +528,7 @@ export default async function LandingPage() {
           <Logo size="sm" />
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <Link href="#planos" className="hover:text-foreground transition-colors">Planos</Link>
+            <Link href="#produtos" className="hover:text-foreground transition-colors">Loja</Link>
             <Link href="#equipe" className="hover:text-foreground transition-colors">Equipe</Link>
             <Link
               href={whatsappHref}
