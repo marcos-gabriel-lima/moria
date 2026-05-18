@@ -22,8 +22,10 @@ function adminDb() {
 
 export const getPlansCache = unstable_cache(
   async () => {
-    const { data } = await db().from('plans').select('*').order('display_order')
-    return data ?? []
+    try {
+      const { data } = await db().from('plans').select('*').order('display_order')
+      return data ?? []
+    } catch { return [] }
   },
   ['plans'],
   { revalidate: 300, tags: ['plans'] }
@@ -31,12 +33,14 @@ export const getPlansCache = unstable_cache(
 
 export const getServicesCache = unstable_cache(
   async () => {
-    const { data } = await db()
-      .from('services')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order')
-    return data ?? []
+    try {
+      const { data } = await db()
+        .from('services')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order')
+      return data ?? []
+    } catch { return [] }
   },
   ['services'],
   { revalidate: 300, tags: ['services'] }
@@ -44,11 +48,13 @@ export const getServicesCache = unstable_cache(
 
 export const getActiveBarbersCache = unstable_cache(
   async () => {
-    const { data } = await db()
-      .from('barbers')
-      .select('*, profile:profiles(id, full_name, avatar_url)')
-      .eq('is_active', true)
-    return data ?? []
+    try {
+      const { data } = await db()
+        .from('barbers')
+        .select('*, profile:profiles(id, full_name, avatar_url)')
+        .eq('is_active', true)
+      return data ?? []
+    } catch { return [] }
   },
   ['active-barbers'],
   { revalidate: 60, tags: ['barbers'] }
@@ -56,12 +62,14 @@ export const getActiveBarbersCache = unstable_cache(
 
 export const getProductsCache = unstable_cache(
   async () => {
-    const { data } = await db()
-      .from('products')
-      .select('*')
-      .eq('is_active', true)
-      .order('name')
-    return data ?? []
+    try {
+      const { data } = await db()
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
+      return data ?? []
+    } catch { return [] }
   },
   ['products'],
   { revalidate: 300, tags: ['products'] }
