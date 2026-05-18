@@ -35,45 +35,20 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const adminRoutes  = ['/admin']
-  const barberRoutes = ['/barber']
-  const clientRoutes = ['/dashboard', '/appointments', '/plans', '/wallet', '/products']
-  const authRoutes   = ['/login', '/register']
+  const protectedRoutes = ['/admin', '/barber', '/dashboard', '/appointments', '/plans', '/wallet', '/products']
+  const authRoutes      = ['/login', '/register']
 
   if (!user) {
-    if ([...adminRoutes, ...barberRoutes, ...clientRoutes].some(r => pathname.startsWith(r))) {
+    if (protectedRoutes.some(r => pathname.startsWith(r))) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
     return supabaseResponse
   }
 
-  const needsRoleCheck =
-    authRoutes.some(r => pathname.startsWith(r)) ||
-    adminRoutes.some(r => pathname.startsWith(r)) ||
-    barberRoutes.some(r => pathname.startsWith(r))
-
-  if (needsRoleCheck) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const role = profile?.role ?? 'client'
-
-    if (authRoutes.some(r => pathname.startsWith(r))) {
-      if (role === 'admin') return NextResponse.redirect(new URL('/admin/dashboard', request.url))
-      if (role === 'barber') return NextResponse.redirect(new URL('/barber/schedule', request.url))
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
-
-    if (adminRoutes.some(r => pathname.startsWith(r)) && role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
-
-    if (barberRoutes.some(r => pathname.startsWith(r)) && !['barber', 'admin'].includes(role)) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+  // Usuário logado tentando acessar login/registro → redireciona para área do cliente
+  // O layout do cliente redireciona admin/barbeiro para suas áreas corretas
+  if (authRoutes.some(r => pathname.startsWith(r))) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
   return supabaseResponse

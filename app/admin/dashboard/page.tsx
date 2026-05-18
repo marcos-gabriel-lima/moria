@@ -56,27 +56,19 @@ async function TodaySchedule({ todayStr }: { todayStr: string }) {
   const dayStart = `${todayStr}T00:00:00`
   const dayEnd   = `${todayStr}T23:59:59`
 
-  const [{ data: todaySchedule }, { count: todayCount }] = await Promise.all([
-    supabase
-      .from('appointments')
-      .select('id, scheduled_at, status, is_subscriber, total_price, client:profiles(full_name, whatsapp, phone), barber:barbers(profile:profiles(full_name)), services:appointment_services(service:services(name))')
-      .gte('scheduled_at', dayStart)
-      .lte('scheduled_at', dayEnd)
-      .not('status', 'in', '("cancelled","no_show")')
-      .order('scheduled_at', { ascending: true }),
-    supabase
-      .from('appointments')
-      .select('*', { count: 'exact', head: true })
-      .gte('scheduled_at', dayStart)
-      .lte('scheduled_at', dayEnd)
-      .not('status', 'in', '("cancelled","no_show")'),
-  ])
+  const { data: todaySchedule } = await supabase
+    .from('appointments')
+    .select('id, scheduled_at, status, is_subscriber, total_price, client:profiles(full_name, whatsapp, phone), barber:barbers(profile:profiles(full_name)), services:appointment_services(service:services(name))')
+    .gte('scheduled_at', dayStart)
+    .lte('scheduled_at', dayEnd)
+    .not('status', 'in', '("cancelled","no_show")')
+    .order('scheduled_at', { ascending: true })
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="font-bold">Agenda de Hoje</h2>
-        <span className="text-xs text-muted-foreground">{todayCount ?? 0} agendamentos</span>
+        <span className="text-xs text-muted-foreground">{todaySchedule?.length ?? 0} agendamentos</span>
       </div>
 
       {!todaySchedule?.length ? (

@@ -6,7 +6,7 @@ import { FloatingCTA } from '@/components/shared/floating-cta'
 import { formatCurrency } from '@/lib/utils'
 import { getPlansCache, getActiveBarbersCache } from '@/lib/queries'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // revalida a cada 5 minutos (ISR)
 
 const SHOP_WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '5511999999999'
 const whatsappHref  = `https://wa.me/${SHOP_WHATSAPP}?text=${encodeURIComponent('Olá! Gostaria de saber mais sobre a MORIA Barbearia.')}`

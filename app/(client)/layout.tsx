@@ -16,6 +16,9 @@ export default async function ClientLayout({ children }: { children: React.React
     .eq('id', user.id)
     .single()
 
+  if (profile?.role === 'admin') redirect('/admin/dashboard')
+  if (profile?.role === 'barber') redirect('/barber/schedule')
+
   return (
     <div className="min-h-screen bg-moria-black flex">
       {/* Sidebar desktop */}
