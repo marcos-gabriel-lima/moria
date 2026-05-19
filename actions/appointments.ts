@@ -204,7 +204,17 @@ export async function getAvailableSlots(
   barberId: string,
   date: string
 ): Promise<ActionResult<{ slots: string[]; blocked: { starts_at: string; ends_at: string }[] }>> {
+  if (!z.string().uuid().safeParse(barberId).success) {
+    return { success: false, error: 'Barbeiro inválido' }
+  }
+  if (!z.string().regex(/^\d{4}-\d{2}-\d{2}$/).safeParse(date).success) {
+    return { success: false, error: 'Data inválida' }
+  }
+
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Não autenticado' }
 
   const dayStart = `${date}T00:00:00`
   const dayEnd = `${date}T23:59:59`

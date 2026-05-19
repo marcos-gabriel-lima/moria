@@ -128,6 +128,19 @@ export async function verifySubscriptionByQR(
 ): Promise<ActionResult<{ isValid: boolean; subscription: Subscription | null; client: { name: string; plan: string } | null }>> {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Não autenticado' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!['barber', 'admin'].includes(profile?.role ?? '')) {
+    return { success: false, error: 'Sem permissão' }
+  }
+
   const { data: sub } = await supabase
     .from('subscriptions')
     .select('*, plan:plans(*), client:profiles(*)')

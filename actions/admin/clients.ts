@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath, updateTag } from 'next/cache'
+import { z } from 'zod'
 import { requireAdmin } from './_guard'
 import { clientsRepo } from '@/lib/repositories/clients'
 import { subscriptionsRepo } from '@/lib/repositories/subscriptions'
@@ -58,6 +59,20 @@ export async function grantManualSubscription(
   planId: string,
   daysFromNow: number
 ): Promise<ActionResult> {
+  const grantSchema = {
+    clientId: z.string().uuid(),
+    planId:   z.string().uuid(),
+    days:     z.number().int().min(1).max(365),
+  }
+  const parsed = {
+    clientId: grantSchema.clientId.safeParse(clientId),
+    planId:   grantSchema.planId.safeParse(planId),
+    days:     grantSchema.days.safeParse(daysFromNow),
+  }
+  if (!parsed.clientId.success || !parsed.planId.success || !parsed.days.success) {
+    return { success: false, error: 'Parâmetros inválidos' }
+  }
+
   try {
     const { supabase } = await requireAdmin()
     const now = new Date()
