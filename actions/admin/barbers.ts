@@ -130,7 +130,10 @@ export async function updateBarber(
   }
 }
 
+const idSchema = z.string().uuid('ID inválido')
+
 export async function toggleBarberActive(barberId: string, isActive: boolean): Promise<ActionResult> {
+  if (!idSchema.safeParse(barberId).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await barbersRepo.setActive(supabase, barberId, isActive)
@@ -143,6 +146,10 @@ export async function toggleBarberActive(barberId: string, isActive: boolean): P
 }
 
 export async function updateBarberCommission(barberId: string, rate: number): Promise<ActionResult> {
+  const rateSchema = z.number().min(0).max(100)
+  if (!idSchema.safeParse(barberId).success || !rateSchema.safeParse(rate).success) {
+    return { success: false, error: 'Parâmetros inválidos' }
+  }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await barbersRepo.setCommission(supabase, barberId, rate)

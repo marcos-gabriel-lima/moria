@@ -30,8 +30,21 @@ export async function createAppointment(
 
   const { barber_id, service_ids, scheduled_at, notes } = parsed.data
 
+  // Valida barber_id: deve existir e estar ativo (não confie no front)
+  const { data: barber } = await supabase
+    .from('barbers')
+    .select('id')
+    .eq('id', barber_id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!barber) return { success: false, error: 'Barbeiro inválido ou indisponível' }
+
+  // Deduplica service_ids (front pode enviar repetidos)
+  const uniqueServiceIds = [...new Set(service_ids)]
+
   const [{ data: services, error: servicesError }, { data: subscription }] = await Promise.all([
-    supabase.from('services').select('*').in('id', service_ids).eq('is_active', true),
+    supabase.from('services').select('*').in('id', uniqueServiceIds).eq('is_active', true),
     supabase
       .from('subscriptions')
       .select('*, plan:plans(*)')
@@ -41,7 +54,7 @@ export async function createAppointment(
       .maybeSingle(),
   ])
 
-  if (servicesError || !services?.length) {
+  if (servicesError || !services?.length || services.length !== uniqueServiceIds.length) {
     return { success: false, error: 'Serviços inválidos' }
   }
 
@@ -179,6 +192,7 @@ export async function completeAppointment(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Não autenticado' }
 
+  // Valida status atual antes de completar (não confie no front)
   const { data, error } = await supabase
     .from('appointments')
     .update({
@@ -187,10 +201,11 @@ export async function completeAppointment(
     })
     .eq('id', appointmentId)
     .eq('barber_id', user.id)
+    .in('status', ['scheduled', 'confirmed', 'in_progress'])
     .select('id')
     .single()
 
-  if (error || !data) return { success: false, error: 'Agendamento não encontrado ou sem permissão' }
+  if (error || !data) return { success: false, error: 'Agendamento não encontrado, sem permissão ou status inválido' }
 
   revalidatePath('/barber/schedule')
   revalidatePath('/admin/dashboard')

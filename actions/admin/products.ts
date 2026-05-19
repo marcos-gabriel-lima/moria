@@ -114,10 +114,13 @@ export async function updateProduct(
   }
 }
 
+const idSchema = z.string().uuid('ID inválido')
+
 export async function toggleProductActive(
   productId: string,
   isActive: boolean
 ): Promise<ActionResult> {
+  if (!idSchema.safeParse(productId).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await productsRepo.setActive(supabase, productId, isActive)
@@ -130,6 +133,10 @@ export async function toggleProductActive(
 }
 
 export async function adjustStock(productId: string, delta: number): Promise<ActionResult> {
+  if (!idSchema.safeParse(productId).success) return { success: false, error: 'ID inválido' }
+  if (!z.number().int().min(-999).max(999).safeParse(delta).success) {
+    return { success: false, error: 'Ajuste de estoque inválido' }
+  }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await productsRepo.adjustStock(supabase, productId, delta)

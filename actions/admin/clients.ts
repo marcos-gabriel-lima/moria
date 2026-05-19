@@ -13,7 +13,10 @@ function revalidateClients(id?: string) {
   updateTag('admin-clients')
 }
 
+const idSchema = z.string().uuid('ID inválido')
+
 export async function toggleClientActive(clientId: string, isActive: boolean): Promise<ActionResult> {
+  if (!idSchema.safeParse(clientId).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await clientsRepo.setActive(supabase, clientId, isActive)
@@ -26,6 +29,8 @@ export async function toggleClientActive(clientId: string, isActive: boolean): P
 }
 
 export async function updateClientNotes(clientId: string, notes: string): Promise<ActionResult> {
+  if (!idSchema.safeParse(clientId).success) return { success: false, error: 'ID inválido' }
+  if (notes.length > 1000) return { success: false, error: 'Notas muito longas (máx 1000 caracteres)' }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await clientsRepo.updateNotes(supabase, clientId, notes)
@@ -41,6 +46,7 @@ export async function cancelClientSubscription(
   subscriptionId: string,
   reason: string
 ): Promise<ActionResult> {
+  if (!idSchema.safeParse(subscriptionId).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await subscriptionsRepo.cancel(supabase, subscriptionId, reason)

@@ -23,12 +23,15 @@ function revalidateServices() {
   updateTag('admin-plans')
 }
 
+const idSchema = z.string().uuid('ID inválido')
+
 export async function upsertService(
   formData: z.infer<typeof serviceSchema> & { id?: string }
 ): Promise<ActionResult> {
+  const { id, ...data } = formData
+  if (id && !idSchema.safeParse(id).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
-    const { id, ...data } = formData
     const parsed = serviceSchema.parse(data)
 
     const { error } = id
@@ -44,6 +47,7 @@ export async function upsertService(
 }
 
 export async function toggleServiceActive(serviceId: string, isActive: boolean): Promise<ActionResult> {
+  if (!idSchema.safeParse(serviceId).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await servicesRepo.setActive(supabase, serviceId, isActive)

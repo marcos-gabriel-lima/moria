@@ -39,10 +39,13 @@ export async function createPlan(formData: PlanInput): Promise<ActionResult<{ id
   }
 }
 
+const idSchema = z.string().uuid('ID inválido')
+
 export async function updatePlan(
   id: string,
   formData: Partial<PlanInput>
 ): Promise<ActionResult> {
+  if (!idSchema.safeParse(id).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await plansRepo.update(supabase, id, formData)
@@ -55,6 +58,7 @@ export async function updatePlan(
 }
 
 export async function togglePlanActive(planId: string, isActive: boolean): Promise<ActionResult> {
+  if (!idSchema.safeParse(planId).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
     const { error } = await plansRepo.setActive(supabase, planId, isActive)
