@@ -37,20 +37,20 @@ export async function subscribeToPlan(
   const now = new Date()
   const expiresAt = addMonths(now, 1)
 
+  // Cria como 'pending' — admin ativa manualmente após confirmar pagamento
+  // Nunca criar como 'active' sem confirmação de pagamento para evitar fraude
   const { data: subscription, error } = await supabase
     .from('subscriptions')
     .insert({
       client_id: user.id,
       plan_id,
-      status: 'active',
-      started_at: now.toISOString(),
-      expires_at: expiresAt.toISOString(),
-      auto_renew: true,
+      status: 'pending',
+      auto_renew: false,
     })
     .select('*, plan:plans(*)')
     .single()
 
-  if (error) return { success: false, error: 'Erro ao criar assinatura' }
+  if (error) return { success: false, error: 'Erro ao criar solicitação de assinatura' }
 
   revalidatePath('/plans')
   revalidatePath('/wallet')

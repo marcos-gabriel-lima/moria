@@ -118,7 +118,7 @@ const updateProfileSchema = z.object({
   full_name:  z.string().min(3).optional(),
   phone:      z.string().min(10).optional(),
   whatsapp:   z.string().min(10).optional(),
-  avatar_url: z.string().url().optional(),
+  avatar_url: z.string().url().refine(u => new URL(u).hostname.endsWith('.supabase.co'), 'URL inválida').optional(),
 })
 
 export async function updateProfile(

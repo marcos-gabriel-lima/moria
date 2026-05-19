@@ -10,7 +10,7 @@ const createAppointmentSchema = z.object({
   barber_id: z.string().uuid(),
   service_ids: z.array(z.string().uuid()).min(1, 'Selecione ao menos 1 serviço'),
   scheduled_at: z.string().datetime(),
-  notes: z.string().optional(),
+  notes: z.string().max(500).optional(),
 })
 
 export async function createAppointment(
