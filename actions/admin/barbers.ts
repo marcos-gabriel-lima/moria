@@ -5,8 +5,32 @@ import { z } from 'zod'
 import { requireAdmin } from './_guard'
 import { barbersRepo } from '@/lib/repositories/barbers'
 import { createAdminClient } from '@/lib/supabase/server'
-import { toActionError } from '@/lib/action-error'
+import { DomainError, toActionError } from '@/lib/action-error'
+import { sendBarberWelcomeEmail } from '@/lib/email'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import type { ActionResult } from '@/types'
+
+/**
+ * Gera um link de recovery (Supabase Auth) e envia email de boas-vindas pro
+ * barbeiro. Falhas de envio NÃO falham a operação que chama — admin pode
+ * reenviar via resendBarberWelcomeEmail.
+ */
+async function sendBarberInvite(
+  adminClient: Awaited<ReturnType<typeof createAdminClient>>,
+  email: string,
+  name: string,
+): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const { data: linkData } = await adminClient.auth.admin.generateLink({
+    type:    'recovery',
+    email,
+    options: { redirectTo: `${appUrl}/auth/callback?next=/auth/set-password` },
+  })
+  const actionLink = linkData?.properties?.action_link
+  if (!actionLink) throw new DomainError('Erro ao gerar link de boas-vindas.')
+
+  await sendBarberWelcomeEmail({ to: email, name, setPasswordLink: actionLink })
+}
 
 const barberSchema = z.object({
   full_name:       z.string().min(3),
@@ -32,6 +56,8 @@ const updateBarberSchema = barberSchema.omit({ email: true, full_name: true }).e
   id:        z.string().uuid(),
   full_name: z.string().min(3).optional(),
 })
+
+const idSchema = z.string().uuid('ID inválido')
 
 function revalidateBarbers(id?: string) {
   revalidatePath('/admin/barbers')
@@ -87,8 +113,44 @@ export async function createBarber(
     if (profileUpdate.error) throw profileUpdate.error
     if (barberInsert.error) throw barberInsert.error
 
+    // Envia email de boas-vindas (fire-and-forget). Falha aqui não desfaz a
+    // criação — admin pode reenviar via resendBarberWelcomeEmail.
+    sendBarberInvite(adminClient, parsed.email, parsed.full_name).catch(() => {})
+
     revalidateBarbers(userId)
     return { success: true, data: { id: userId } }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
+  }
+}
+
+export async function resendBarberWelcomeEmail(barberId: string): Promise<ActionResult> {
+  if (!idSchema.safeParse(barberId).success) return { success: false, error: 'ID inválido' }
+  try {
+    const { userId } = await requireAdmin()
+
+    const rl = await checkRateLimit('adminBarberResend', userId, RATE_LIMITS.adminAction)
+    if (!rl.success) throw new DomainError('Muitos reenvios. Aguarde 1 minuto.')
+
+    const adminClient = await createAdminClient()
+
+    const { data: authUser } = await adminClient.auth.admin.getUserById(barberId)
+    const email = authUser?.user?.email
+    if (!email) throw new DomainError('Barbeiro não encontrado.')
+
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('full_name, role')
+      .eq('id', barberId)
+      .single()
+
+    if (profile?.role !== 'barber' && profile?.role !== 'admin') {
+      throw new DomainError('Usuário não é barbeiro.')
+    }
+
+    await sendBarberInvite(adminClient, email, profile.full_name ?? 'Barbeiro')
+
+    return { success: true, data: undefined }
   } catch (e) {
     return { success: false, error: toActionError(e) }
   }
@@ -130,8 +192,6 @@ export async function updateBarber(
     return { success: false, error: toActionError(e) }
   }
 }
-
-const idSchema = z.string().uuid('ID inválido')
 
 export async function toggleBarberActive(barberId: string, isActive: boolean): Promise<ActionResult> {
   if (!idSchema.safeParse(barberId).success) return { success: false, error: 'ID inválido' }

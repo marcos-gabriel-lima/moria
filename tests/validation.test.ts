@@ -17,6 +17,10 @@ const signInSchema = z.object({
   password: z.string().min(1, 'Senha obrigatória').max(128, 'Senha muito longa'),
 })
 
+const setPasswordSchema = z.object({
+  password: z.string().min(6, 'Senha deve ter ao menos 6 caracteres').max(128, 'Senha muito longa'),
+})
+
 const createAppointmentSchema = z.object({
   barber_id: z.string().uuid(),
   service_ids: z.array(z.string().uuid()).min(1, 'Selecione ao menos 1 serviço').max(10, 'Máximo de 10 serviços por agendamento'),
@@ -100,6 +104,42 @@ describe('signInSchema — Login', () => {
   it('rejeita e-mail mal formado', () => {
     const result = signInSchema.safeParse({ email: 'isso-nao-e-email', password: 'x' })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('setPasswordSchema — Definir senha (fluxo barber welcome)', () => {
+  it('aceita senha válida (6 chars)', () => {
+    expect(setPasswordSchema.safeParse({ password: '123456' }).success).toBe(true)
+  })
+
+  it('aceita senha longa (128 chars)', () => {
+    expect(setPasswordSchema.safeParse({ password: 'a'.repeat(128) }).success).toBe(true)
+  })
+
+  it('rejeita senha curta (< 6 chars)', () => {
+    const result = setPasswordSchema.safeParse({ password: '12345' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.errors[0].message).toContain('6 caracteres')
+    }
+  })
+
+  it('rejeita senha vazia', () => {
+    expect(setPasswordSchema.safeParse({ password: '' }).success).toBe(false)
+  })
+
+  it('🛡️ rejeita senha com mais de 128 chars (proteção DoS bcrypt)', () => {
+    const result = setPasswordSchema.safeParse({ password: 'a'.repeat(129) })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.errors[0].message).toContain('muito longa')
+    }
+  })
+
+  it('rejeita tipos não-string', () => {
+    expect(setPasswordSchema.safeParse({ password: 123456 }).success).toBe(false)
+    expect(setPasswordSchema.safeParse({ password: null }).success).toBe(false)
+    expect(setPasswordSchema.safeParse({}).success).toBe(false)
   })
 })
 

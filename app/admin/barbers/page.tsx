@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Scissors, ChevronRight, Instagram } from 'lucide-react'
 import { PageHeader } from '@/components/admin/page-header'
 import { BarberToggle } from '@/components/admin/barber-toggle'
+import { ResendInviteButton } from '@/components/admin/resend-invite-button'
 import { WhatsAppButton } from '@/components/shared/whatsapp-button'
 import { CreateBarberButton } from '@/components/admin/create-barber-button'
 import { getAdminBarbers } from '@/lib/queries'
@@ -125,6 +126,7 @@ async function BarbersList() {
                 >
                   Editar <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
+                <ResendInviteButton barberId={barber.id} />
                 <BarberToggle barberId={barber.id} isActive={barber.is_active} />
               </div>
             </div>

@@ -101,6 +101,30 @@ export async function sendAppointmentReminderEmail(p: ReminderEmailParams) {
   return getResend()?.emails.send({ from: FROM, to: p.to, subject: '🔔 Lembrete: seu horário é amanhã — MORIA', html: base('Lembrete de agendamento', body) })
 }
 
+// ─── Boas-vindas ao barbeiro (definir senha) ─────────────────────────────────
+
+type BarberWelcomeParams = {
+  to:              string
+  name:            string
+  setPasswordLink: string
+}
+
+export async function sendBarberWelcomeEmail(p: BarberWelcomeParams) {
+  const body = `
+    ${h1('Bem-vindo à MORIA!')}
+    <p style="margin:0 0 12px;color:#999;font-size:14px">Olá, ${gold(p.name)}!</p>
+    <p style="margin:0 0 24px;color:#999;font-size:14px">Você foi adicionado(a) como barbeiro no sistema MORIA. Para acessar sua conta pela primeira vez, defina sua senha clicando abaixo:</p>
+    <div style="text-align:center">${btn(p.setPasswordLink, 'Definir minha senha')}</div>
+    <p style="margin:24px 0 0;font-size:12px;color:#666;text-align:center">Este link expira em 1 hora. Se expirar, peça à administração para reenviar.</p>
+  `
+  return getResend()?.emails.send({
+    from:    FROM,
+    to:      p.to,
+    subject: '🪒 Bem-vindo à MORIA — defina sua senha',
+    html:    base('Bem-vindo à MORIA', body),
+  })
+}
+
 // ─── Subscription active ─────────────────────────────────────────────────────
 
 type SubscriptionActiveParams = {

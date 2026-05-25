@@ -7,12 +7,14 @@ import { headers } from 'next/headers'
 import type { ActionResult } from '@/types'
 import { z } from 'zod'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { resolveClientIp } from '@/lib/client-ip'
 
 async function getClientIp(): Promise<string> {
   const h = await headers()
-  const forwarded = h.get('x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0].trim()
-  return h.get('x-real-ip') ?? 'anon'
+  return resolveClientIp({
+    forwardedFor: h.get('x-forwarded-for'),
+    realIp:       h.get('x-real-ip'),
+  })
 }
 
 const signUpSchema = z.object({
@@ -115,6 +117,36 @@ export async function getProfile() {
     .single()
 
   return data
+}
+
+const setPasswordSchema = z.object({
+  password: z.string().min(6, 'Senha deve ter ao menos 6 caracteres').max(128, 'Senha muito longa'),
+})
+
+/**
+ * Define a senha do próprio usuário logado.
+ *
+ * Usado após recovery flow (barbeiro recebe email de boas-vindas e cai na
+ * página /auth/set-password com sessão ativa via /auth/callback).
+ */
+export async function setOwnPassword(newPassword: string): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Não autenticado' }
+
+  // Rate limit por user.id (mais específico que IP — usuário autenticado).
+  const rl = await checkRateLimit('setPassword', user.id, RATE_LIMITS.auth)
+  if (!rl.success) return { success: false, error: 'Muitas tentativas. Aguarde 1 minuto.' }
+
+  const parsed = setPasswordSchema.safeParse({ password: newPassword })
+  if (!parsed.success) return { success: false, error: parsed.error.errors[0].message }
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
+  if (error) return { success: false, error: 'Erro ao atualizar senha. Tente novamente.' }
+
+  revalidatePath('/', 'layout')
+  return { success: true, data: undefined }
 }
 
 const updateProfileSchema = z.object({
