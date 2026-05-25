@@ -3,26 +3,39 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import type { ActionResult } from '@/types'
 import { z } from 'zod'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+
+async function getClientIp(): Promise<string> {
+  const h = await headers()
+  const forwarded = h.get('x-forwarded-for')
+  if (forwarded) return forwarded.split(',')[0].trim()
+  return h.get('x-real-ip') ?? 'anon'
+}
 
 const signUpSchema = z.object({
-  full_name: z.string().min(3, 'Nome deve ter ao menos 3 caracteres'),
-  email: z.string().email('E-mail inválido'),
-  phone: z.string().min(10, 'Telefone inválido').optional(),
-  whatsapp: z.string().min(10, 'WhatsApp inválido').optional(),
-  password: z.string().min(6, 'Senha deve ter ao menos 6 caracteres'),
+  full_name: z.string().min(3, 'Nome deve ter ao menos 3 caracteres').max(120, 'Nome muito longo'),
+  email: z.string().email('E-mail inválido').max(254, 'E-mail muito longo'),
+  phone: z.string().min(10, 'Telefone inválido').max(20, 'Telefone muito longo').optional(),
+  whatsapp: z.string().min(10, 'WhatsApp inválido').max(20, 'WhatsApp muito longo').optional(),
+  password: z.string().min(6, 'Senha deve ter ao menos 6 caracteres').max(128, 'Senha muito longa'),
 })
 
 const signInSchema = z.object({
-  email: z.string().email('E-mail inválido'),
-  password: z.string().min(1, 'Senha obrigatória'),
+  email: z.string().email('E-mail inválido').max(254, 'E-mail muito longo'),
+  password: z.string().min(1, 'Senha obrigatória').max(128, 'Senha muito longa'),
 })
 
 export async function signUp(
   formData: z.infer<typeof signUpSchema>
 ): Promise<ActionResult<{ session: boolean }>> {
   const supabase = await createClient()
+
+  const ip = await getClientIp()
+  const rl = await checkRateLimit('signup', `ip:${ip}`, RATE_LIMITS.auth)
+  if (!rl.success) return { success: false, error: 'Muitas tentativas de cadastro. Aguarde 1 minuto.' }
 
   const parsed = signUpSchema.safeParse(formData)
   if (!parsed.success) {
@@ -55,6 +68,10 @@ export async function signIn(
 ): Promise<ActionResult<{ role: string }>> {
   const supabase = await createClient()
 
+  const ip = await getClientIp()
+  const rl = await checkRateLimit('signin', `ip:${ip}`, RATE_LIMITS.auth)
+  if (!rl.success) return { success: false, error: 'Muitas tentativas de login. Aguarde 1 minuto.' }
+
   const parsed = signInSchema.safeParse(formData)
   if (!parsed.success) {
     return { success: false, error: parsed.error.errors[0].message }
@@ -79,20 +96,6 @@ export async function signIn(
   return { success: true, data: { role: profile?.role ?? 'client' } }
 }
 
-export async function signInWithMagicLink(email: string): Promise<ActionResult> {
-  const supabase = await createClient()
-
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-    },
-  })
-
-  if (error) return { success: false, error: 'Erro ao enviar link mágico' }
-  return { success: true, data: undefined }
-}
-
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
@@ -115,10 +118,10 @@ export async function getProfile() {
 }
 
 const updateProfileSchema = z.object({
-  full_name:  z.string().min(3).optional(),
-  phone:      z.string().min(10).optional(),
-  whatsapp:   z.string().min(10).optional(),
-  avatar_url: z.string().url().refine(u => new URL(u).hostname.endsWith('.supabase.co'), 'URL inválida').optional(),
+  full_name:  z.string().min(3).max(120).optional(),
+  phone:      z.string().min(10).max(20).optional(),
+  whatsapp:   z.string().min(10).max(20).optional(),
+  avatar_url: z.string().url().max(2048).refine(u => new URL(u).hostname.endsWith('.supabase.co'), 'URL inválida').optional(),
 })
 
 export async function updateProfile(

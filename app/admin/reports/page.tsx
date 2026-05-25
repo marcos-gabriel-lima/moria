@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/admin/page-header'
 import { StatsCard } from '@/components/admin/stats-card'
 import { BarChart, HorizontalBreakdown } from '@/components/admin/bar-chart'
 import { formatCurrency } from '@/lib/utils'
+import { monthlyRecurringRevenue } from '@/lib/reports'
 
 export const metadata = { title: 'Relatórios' }
 
@@ -43,6 +44,9 @@ export default async function AdminReportsPage({
   // Receita acumulada do período
   const totalPeriodRevenue = revenueByMonth.reduce((s, m) => s + m.value, 0)
 
+  // MRR real: soma price × count de cada plano (não mais placeholder)
+  const mrr = monthlyRecurringRevenue(subscriptionBreakdown)
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -50,13 +54,13 @@ export default async function AdminReportsPage({
         description="Análise financeira e operacional da barbearia"
         icon={BarChart3}
         actions={
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Período:</span>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
+            <span className="text-xs">Período:</span>
             {[3, 6, 12].map(m => (
               <a
                 key={m}
                 href={`/admin/reports?months=${m}`}
-                className={`px-2.5 py-1 rounded-md border text-xs font-medium transition-colors ${
+                className={`min-w-[36px] min-h-[36px] px-2.5 py-1.5 rounded-md border text-xs font-medium transition-colors flex items-center justify-center ${
                   monthsBack === m
                     ? 'bg-gold-DEFAULT text-black border-gold-DEFAULT'
                     : 'border-moria-border hover:border-gold-DEFAULT/40'
@@ -102,7 +106,7 @@ export default async function AdminReportsPage({
       </div>
 
       {/* Gráficos: Receita + Breakdown */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-4 lg:gap-6">
         {/* Receita por mês */}
         <div className="p-6 rounded-xl bg-moria-surface border border-moria-border space-y-4">
           <div className="flex items-center justify-between">
@@ -151,12 +155,7 @@ export default async function AdminReportsPage({
             {totalActiveSubscriptions > 0 && (
               <div className="mt-1">
                 <p className="text-xs text-muted-foreground">
-                  MRR estimado: {formatCurrency(
-                    subscriptionBreakdown.reduce((s, p) => {
-                      // estimativa simples baseada na contagem
-                      return s + p.count * 150 // Valor médio placeholder
-                    }, 0)
-                  )}
+                  MRR: {formatCurrency(mrr)}
                 </p>
               </div>
             )}
@@ -165,7 +164,7 @@ export default async function AdminReportsPage({
       </div>
 
       {/* Ranking de Barbeiros + Status */}
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-2 gap-4 lg:gap-6">
         {/* Ranking de barbeiros */}
         <div className="p-6 rounded-xl bg-moria-surface border border-moria-border space-y-4">
           <div className="flex items-center gap-2">

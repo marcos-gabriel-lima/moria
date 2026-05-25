@@ -38,21 +38,21 @@ export default async function PlansPage() {
       </div>
 
       {/* Benefícios gerais */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
-          { icon: Crown, label: 'Prioridade total no agendamento' },
-          { icon: Clock, label: 'Agende com qualquer antecedência' },
-          { icon: Shield, label: 'Cancele quando quiser, sem multa' },
+          { icon: Crown, label: 'Prioridade total' },
+          { icon: Clock, label: 'Agende quando quiser' },
+          { icon: Shield, label: 'Cancele quando quiser' },
         ].map(({ icon: Icon, label }) => (
-          <div key={label} className="flex flex-col items-center gap-2 p-3 rounded-lg bg-moria-surface border border-moria-border text-center">
-            <Icon className="w-4 h-4 text-gold-DEFAULT" />
-            <p className="text-xs text-muted-foreground">{label}</p>
+          <div key={label} className="flex flex-col items-center gap-1.5 p-2 sm:p-3 rounded-lg bg-moria-surface border border-moria-border text-center">
+            <Icon className="w-4 h-4 text-gold-DEFAULT shrink-0" />
+            <p className="text-[11px] sm:text-xs text-muted-foreground leading-tight">{label}</p>
           </div>
         ))}
       </div>
 
       {/* Cards de planos */}
-      <div className="grid sm:grid-cols-3 gap-6">
+      <div className="grid sm:grid-cols-3 gap-4 sm:gap-6">
         {plans.map(plan => (
           <PlanSubscribeButton
             key={plan.id}

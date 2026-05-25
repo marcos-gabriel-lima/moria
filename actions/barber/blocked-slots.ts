@@ -4,7 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireBarber } from './_guard'
 import { blockedSlotsRepo } from '@/lib/repositories/blocked-slots'
+import { DomainError, toActionError } from '@/lib/action-error'
 import type { ActionResult, BlockedSlot } from '@/types'
+
+const MAX_BLOCK_DURATION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
 const createBlockSchema = z.object({
   starts_at: z.string().datetime(),
@@ -20,8 +23,18 @@ export async function createBlockedSlot(
 
     const parsed = createBlockSchema.parse(input)
 
-    if (parsed.ends_at <= parsed.starts_at) {
+    const start = new Date(parsed.starts_at)
+    const end   = new Date(parsed.ends_at)
+    const now   = new Date()
+
+    if (end <= start) {
       return { success: false, error: 'O horário de fim deve ser após o início' }
+    }
+    if (start < now) {
+      return { success: false, error: 'Não é possível bloquear horários no passado' }
+    }
+    if (end.getTime() - start.getTime() > MAX_BLOCK_DURATION_MS) {
+      return { success: false, error: 'Bloqueio não pode ultrapassar 30 dias' }
     }
 
     const { data, error } = await blockedSlotsRepo.create(supabase, {
@@ -32,16 +45,16 @@ export async function createBlockedSlot(
     })
 
     if (error) {
-      if (error.message.includes('SLOT_CONFLICT')) {
-        return { success: false, error: 'Já existe um agendamento neste horário' }
+      if (error.message?.includes('SLOT_CONFLICT')) {
+        throw new DomainError('Já existe um agendamento neste horário')
       }
       throw error
     }
 
     revalidatePath('/barber/schedule')
     return { success: true, data: data as BlockedSlot }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -57,7 +70,7 @@ export async function deleteBlockedSlot(slotId: string): Promise<ActionResult> {
 
     revalidatePath('/barber/schedule')
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }

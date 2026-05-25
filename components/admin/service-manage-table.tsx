@@ -22,7 +22,8 @@ interface ServiceManageTableProps {
 export function ServiceManageTable({ services }: ServiceManageTableProps) {
   return (
     <div className="rounded-xl border border-moria-border overflow-hidden">
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[480px]">
         <thead>
           <tr className="border-b border-moria-border bg-moria-elevated">
             <th className="text-left p-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Serviço</th>
@@ -39,6 +40,7 @@ export function ServiceManageTable({ services }: ServiceManageTableProps) {
           ))}
         </tbody>
       </table>
+      </div>
       {services.length === 0 && (
         <div className="py-12 text-center text-muted-foreground text-sm">
           Nenhum serviço cadastrado

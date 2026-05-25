@@ -26,12 +26,12 @@ export function ClientNav({ mobile }: { mobile?: boolean }) {
               key={href}
               href={href}
               className={cn(
-                'flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors',
+                'flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors min-w-0',
                 isActive ? 'text-gold-DEFAULT' : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{label}</span>
+              <Icon className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-medium truncate w-full text-center px-0.5">{label}</span>
             </Link>
           )
         })}

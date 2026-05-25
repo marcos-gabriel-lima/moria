@@ -5,6 +5,7 @@ import { updateTag } from 'next/cache'
 import { z } from 'zod'
 import { requireBarber } from './_guard'
 import { barbersRepo } from '@/lib/repositories/barbers'
+import { toActionError } from '@/lib/action-error'
 import type { ActionResult } from '@/types'
 
 const profileSchema = z.object({
@@ -50,7 +51,7 @@ export async function updateBarberSelfProfile(
     updateTag('admin-barbers')
     updateTag('barbers')
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }

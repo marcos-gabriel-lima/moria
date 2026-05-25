@@ -5,11 +5,16 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { addMinutes } from 'date-fns'
 import type { ActionResult, Appointment } from '@/types'
 import { z } from 'zod'
+import { sendAppointmentConfirmedEmail } from '@/lib/email'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 const createAppointmentSchema = z.object({
   barber_id: z.string().uuid(),
-  service_ids: z.array(z.string().uuid()).min(1, 'Selecione ao menos 1 serviço'),
-  scheduled_at: z.string().datetime(),
+  service_ids: z.array(z.string().uuid()).min(1, 'Selecione ao menos 1 serviço').max(10, 'Máximo de 10 serviços por agendamento'),
+  scheduled_at: z.string().datetime().refine(
+    s => new Date(s).getTime() > Date.now(),
+    'Não é possível agendar horários no passado'
+  ),
   notes: z.string().max(500).optional(),
 })
 
@@ -22,6 +27,9 @@ export async function createAppointment(
   if (authError || !user) {
     return { success: false, error: 'Não autenticado' }
   }
+
+  const rl = await checkRateLimit('createBooking', user.id, RATE_LIMITS.createBooking)
+  if (!rl.success) return { success: false, error: 'Muitos agendamentos seguidos. Aguarde 1 minuto.' }
 
   const parsed = createAppointmentSchema.safeParse(formData)
   if (!parsed.success) {
@@ -131,6 +139,22 @@ export async function createAppointment(
   revalidatePath('/admin/dashboard')
   updateTag('admin-kpis')
 
+  // Envia email de confirmação (fire-and-forget — não bloqueia a resposta)
+  const { data: authUser } = await supabase.auth.getUser()
+  if (authUser?.user?.email) {
+    const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+    const barberName = (await supabase.from('profiles').select('full_name').eq('id', barber_id).single()).data?.full_name ?? 'Barbeiro'
+    sendAppointmentConfirmedEmail({
+      to:          authUser.user.email,
+      clientName:  authUser.user.user_metadata?.full_name ?? 'Cliente',
+      barberName,
+      serviceName: services.map(s => s.name).join(', '),
+      scheduledAt: new Date(scheduled_at),
+      totalPrice:  actualPrice,
+      appUrl,
+    }).catch(() => {})
+  }
+
   return { success: true, data: appointment as Appointment }
 }
 
@@ -162,7 +186,7 @@ export async function cancelAppointment(
     return { success: false, error: 'Este agendamento não pode ser cancelado' }
   }
 
-  const { error } = await supabase
+  const { data: cancelResult, error } = await supabase
     .from('appointments')
     .update({
       status: 'cancelled',
@@ -170,8 +194,12 @@ export async function cancelAppointment(
       cancel_reason: reason ?? null,
     })
     .eq('id', appointmentId)
+    .not('status', 'in', '("completed","cancelled")')
+    .select('id')
+    .maybeSingle()
 
   if (error) return { success: false, error: 'Erro ao cancelar agendamento' }
+  if (!cancelResult) return { success: false, error: 'Agendamento não pode ser cancelado' }
 
   revalidatePath('/appointments')
   revalidatePath('/barber/schedule')
@@ -230,6 +258,9 @@ export async function getAvailableSlots(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Não autenticado' }
+
+  const rl = await checkRateLimit('availableSlots', user.id, RATE_LIMITS.availableSlots)
+  if (!rl.success) return { success: false, error: 'Muitas consultas. Aguarde 1 minuto.' }
 
   const dayStart = `${date}T00:00:00`
   const dayEnd = `${date}T23:59:59`

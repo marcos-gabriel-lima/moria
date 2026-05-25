@@ -46,7 +46,8 @@ async function ClientsTable({
   return (
     <>
       <div className="rounded-xl border border-moria-border overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[480px]">
           <thead>
             <tr className="border-b border-moria-border bg-moria-elevated">
               <th className="text-left p-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -152,6 +153,7 @@ async function ClientsTable({
             Nenhum cliente encontrado
           </div>
         )}
+        </div>
       </div>
 
       {totalPages > 1 && (
@@ -161,7 +163,7 @@ async function ClientsTable({
               key={p}
               href={`/admin/clients?filter=${filter}&page=${p}${query ? `&q=${query}` : ''}`}
               className={cn(
-                'w-8 h-8 rounded-lg text-sm font-medium flex items-center justify-center border transition-colors',
+                'min-w-[40px] h-10 px-2 rounded-lg text-sm font-medium flex items-center justify-center border transition-colors',
                 p === page
                   ? 'bg-gold-DEFAULT text-black border-gold-DEFAULT'
                   : 'border-moria-border text-muted-foreground hover:border-gold-DEFAULT/40'

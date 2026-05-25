@@ -1,10 +1,13 @@
 import type { NextConfig } from "next";
 import withPWA from "@ducanh2912/next-pwa";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   turbopack: {},
-  serverActions: {
-    bodySizeLimit: '5mb',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '5mb',
+    },
   },
   images: {
     remotePatterns: [
@@ -18,7 +21,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA({
+const withPWAConfig = withPWA({
   dest: "public",
   register: true,
   disable: process.env.NODE_ENV === "development",
@@ -26,3 +29,11 @@ export default withPWA({
     skipWaiting: true,
   },
 })(nextConfig);
+
+export default withSentryConfig(withPWAConfig, {
+  org:     process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent:  true,
+  widenClientFileUpload: true,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+});

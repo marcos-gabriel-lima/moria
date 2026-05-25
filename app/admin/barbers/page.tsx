@@ -118,18 +118,18 @@ async function BarbersList() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <BarberToggle barberId={barber.id} isActive={barber.is_active} />
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-3 shrink-0">
                 <Link
                   href={`/admin/barbers/${barber.id}`}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold-DEFAULT transition-colors"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold-DEFAULT transition-colors order-first sm:order-none"
                 >
                   Editar <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
+                <BarberToggle barberId={barber.id} isActive={barber.is_active} />
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-moria-border grid grid-cols-3 gap-4 text-sm">
+            <div className="mt-4 pt-4 border-t border-moria-border grid grid-cols-3 gap-2 sm:gap-4 text-sm">
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Horário</p>
                 <p className="font-medium">

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { requireAdmin } from './_guard'
 import { barbersRepo } from '@/lib/repositories/barbers'
 import { createAdminClient } from '@/lib/supabase/server'
+import { toActionError } from '@/lib/action-error'
 import type { ActionResult } from '@/types'
 
 const barberSchema = z.object({
@@ -88,8 +89,8 @@ export async function createBarber(
 
     revalidateBarbers(userId)
     return { success: true, data: { id: userId } }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -125,8 +126,8 @@ export async function updateBarber(
 
     revalidateBarbers(id)
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -140,8 +141,8 @@ export async function toggleBarberActive(barberId: string, isActive: boolean): P
     if (error) throw error
     revalidateBarbers(barberId)
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -156,7 +157,7 @@ export async function updateBarberCommission(barberId: string, rate: number): Pr
     if (error) throw error
     revalidatePath(`/admin/barbers/${barberId}`)
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }

@@ -10,7 +10,7 @@ export const metadata = { title: 'Produtos' }
 function ProductsSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {[...Array(3)].map((_, i) => (
           <div key={i} className="rounded-xl bg-moria-surface border border-moria-border p-4 h-20" />
         ))}
@@ -33,20 +33,20 @@ async function ProductsContent() {
 
   return (
     <>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl bg-moria-surface border border-moria-border p-4 text-center">
-          <p className="text-2xl font-black text-gold-DEFAULT">{active}</p>
-          <p className="text-xs text-muted-foreground mt-1">Ativos</p>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="rounded-xl bg-moria-surface border border-moria-border p-3 sm:p-4 text-center">
+          <p className="text-xl sm:text-2xl font-black text-gold-DEFAULT">{active}</p>
+          <p className="text-[11px] sm:text-xs text-muted-foreground mt-1">Ativos</p>
         </div>
-        <div className="rounded-xl bg-moria-surface border border-moria-border p-4 text-center">
-          <p className="text-2xl font-black text-muted-foreground">{inactive}</p>
-          <p className="text-xs text-muted-foreground mt-1">Inativos</p>
+        <div className="rounded-xl bg-moria-surface border border-moria-border p-3 sm:p-4 text-center">
+          <p className="text-xl sm:text-2xl font-black text-muted-foreground">{inactive}</p>
+          <p className="text-[11px] sm:text-xs text-muted-foreground mt-1">Inativos</p>
         </div>
-        <div className={`rounded-xl bg-moria-surface border p-4 text-center ${lowStock > 0 ? 'border-red-500/30' : 'border-moria-border'}`}>
-          <p className={`text-2xl font-black ${lowStock > 0 ? 'text-red-400' : 'text-foreground'}`}>
+        <div className={`rounded-xl bg-moria-surface border p-3 sm:p-4 text-center ${lowStock > 0 ? 'border-red-500/30' : 'border-moria-border'}`}>
+          <p className={`text-xl sm:text-2xl font-black ${lowStock > 0 ? 'text-red-400' : 'text-foreground'}`}>
             {lowStock}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">Estoque baixo</p>
+          <p className="text-[11px] sm:text-xs text-muted-foreground mt-1">Estoque baixo</p>
         </div>
       </div>
 

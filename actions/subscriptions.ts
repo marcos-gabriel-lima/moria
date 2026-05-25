@@ -2,9 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath, updateTag } from 'next/cache'
-import { addMonths } from 'date-fns'
 import type { ActionResult, Subscription } from '@/types'
 import { z } from 'zod'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { isValidQRTokenFormat } from '@/lib/qr-token'
 
 const subscribeSchema = z.object({
   plan_id: z.string().uuid(),
@@ -17,6 +18,9 @@ export async function subscribeToPlan(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Não autenticado' }
+
+  const rl = await checkRateLimit('subscribe', user.id, RATE_LIMITS.subscribe)
+  if (!rl.success) return { success: false, error: 'Muitas solicitações. Aguarde 1 minuto e tente novamente.' }
 
   const parsed = subscribeSchema.safeParse(formData)
   if (!parsed.success) {
@@ -34,11 +38,8 @@ export async function subscribeToPlan(
 
   if (!plan) return { success: false, error: 'Plano não encontrado' }
 
-  const now = new Date()
-  const expiresAt = addMonths(now, 1)
-
-  // Cria como 'pending' — admin ativa manualmente após confirmar pagamento
-  // Nunca criar como 'active' sem confirmação de pagamento para evitar fraude
+  // Cria como 'pending' — admin ativa manualmente após confirmar pagamento.
+  // started_at/expires_at são definidos na ativação (ver activateSubscription).
   const { data: subscription, error } = await supabase
     .from('subscriptions')
     .insert({
@@ -130,6 +131,14 @@ export async function verifySubscriptionByQR(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Não autenticado' }
+
+  const rl = await checkRateLimit('qrVerify', user.id, RATE_LIMITS.qrVerify)
+  if (!rl.success) return { success: false, error: 'Muitas tentativas de validação. Aguarde 1 minuto.' }
+
+  // Formato strict: 64 chars hex (256 bits). Falha barato antes de tocar o BD.
+  if (!isValidQRTokenFormat(token)) {
+    return { success: false, error: 'Token inválido' }
+  }
 
   const { data: profile } = await supabase
     .from('profiles')

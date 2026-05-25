@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { requireAdmin } from './_guard'
 import { servicesRepo } from '@/lib/repositories/services'
+import { toActionError } from '@/lib/action-error'
 import type { ActionResult } from '@/types'
 
 const serviceSchema = z.object({
@@ -41,8 +42,8 @@ export async function upsertService(
     if (error) throw error
     revalidateServices()
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -54,7 +55,7 @@ export async function toggleServiceActive(serviceId: string, isActive: boolean):
     if (error) throw error
     revalidateServices()
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }

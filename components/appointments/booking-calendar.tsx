@@ -77,9 +77,9 @@ export function BookingCalendar({
         <button
           onClick={prevDay}
           disabled={isSameDay(currentDate, minDate)}
-          className="p-1.5 rounded-md hover:bg-moria-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="min-w-[40px] min-h-[40px] p-2 rounded-md hover:bg-moria-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-5 h-5" />
         </button>
 
         <div className="text-center">
@@ -94,9 +94,9 @@ export function BookingCalendar({
         <button
           onClick={nextDay}
           disabled={isSameDay(currentDate, maxDate)}
-          className="p-1.5 rounded-md hover:bg-moria-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="min-w-[40px] min-h-[40px] p-2 rounded-md hover:bg-moria-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-5 h-5" />
         </button>
       </div>
 
@@ -107,14 +107,14 @@ export function BookingCalendar({
       </div>
 
       {/* Grade de horários */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {slots.map((slot) => (
           <button
             key={slot.time}
             disabled={!slot.available}
             onClick={() => slot.available && onSelectSlot(slot.datetime)}
             className={cn(
-              'py-2.5 rounded-lg text-sm font-medium border transition-all duration-150',
+              'min-h-[44px] py-2 rounded-lg text-sm font-medium border transition-all duration-150',
               selectedSlot && isSameDay(slot.datetime, selectedSlot) &&
               slot.time === format(selectedSlot, 'HH:mm')
                 ? 'slot-selected'

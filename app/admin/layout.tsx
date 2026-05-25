@@ -10,11 +10,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user) redirect('/login')
 
   const supabase = await createClient()
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, role')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profile }, { count: pendingCount }] = await Promise.all([
+    supabase.from('profiles').select('full_name, role').eq('id', user.id).single(),
+    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+  ])
 
   if (profile?.role !== 'admin') redirect('/dashboard')
 
@@ -30,7 +29,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          <AdminNav />
+          <AdminNav pendingCount={pendingCount ?? 0} />
         </nav>
 
         <div className="p-3 border-t border-moria-border space-y-1">
@@ -77,8 +76,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
         {/* Mobile bottom nav */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-moria-border bg-moria-surface/95 backdrop-blur-md">
-          <div className="flex items-center justify-around h-16 px-2">
-            <AdminNav mobile />
+          <div className="flex items-center h-16 px-1 overflow-x-auto scrollbar-none">
+            <AdminNav mobile pendingCount={pendingCount ?? 0} />
           </div>
         </nav>
       </div>

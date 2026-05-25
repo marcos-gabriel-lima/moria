@@ -1,30 +1,49 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import {
+  applyDelete,
+  applyInsert,
+  applyUpdate,
+  reconcileInitialFetch,
+} from '@/lib/realtime-state'
 import type { Appointment } from '@/types'
 
 export function useRealtimeAppointments(barberId: string, date: string) {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const supabase = createClient()
+  // Ref pra detectar se a busca inicial foi superada por eventos do realtime.
+  const fetchedAtRef = useRef<number>(0)
 
   useEffect(() => {
+    // Filtro local de dia usa YYYY-MM-DD (timezone do navegador / Supabase trata UTC).
     const dayStart = `${date}T00:00:00.000Z`
-    const dayEnd = `${date}T23:59:59.999Z`
+    const dayEnd   = `${date}T23:59:59.999Z`
 
-    // Busca inicial
+    let cancelled = false
+    const mountedAt = Date.now()
+    fetchedAtRef.current = 0
+
+    // Busca inicial — pode ser superada por eventos realtime (race condition).
+    // Por isso usamos reconcileInitialFetch pra preservar inserts que chegaram antes.
     supabase
       .from('appointments')
-      .select('*, client:profiles(full_name, phone, whatsapp), services:appointment_services(*, service:services(*))')
+      .select(
+        '*, client:profiles(full_name, phone, whatsapp), services:appointment_services(*, service:services(*))',
+      )
       .eq('barber_id', barberId)
       .gte('scheduled_at', dayStart)
       .lte('scheduled_at', dayEnd)
       .not('status', 'in', '("cancelled","no_show")')
       .then(({ data }) => {
-        if (data) setAppointments(data as unknown as Appointment[])
+        if (cancelled || !data) return
+        fetchedAtRef.current = mountedAt
+        setAppointments(prev =>
+          reconcileInitialFetch(data as unknown as Appointment[], prev, date),
+        )
       })
 
-    // Subscribe para atualizações em tempo real
     const channel = supabase
       .channel(`appointments:barber:${barberId}:${date}`)
       .on(
@@ -36,22 +55,21 @@ export function useRealtimeAppointments(barberId: string, date: string) {
           filter: `barber_id=eq.${barberId}`,
         },
         (payload) => {
+          if (cancelled) return
           if (payload.eventType === 'INSERT') {
-            setAppointments(prev => [...prev, payload.new as Appointment].sort(
-              (a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
-            ))
+            setAppointments(prev => applyInsert(prev, payload.new as Appointment, date))
           } else if (payload.eventType === 'UPDATE') {
-            setAppointments(prev =>
-              prev.map(a => a.id === payload.new.id ? { ...a, ...payload.new } : a)
-            )
+            setAppointments(prev => applyUpdate(prev, payload.new as Appointment, date))
           } else if (payload.eventType === 'DELETE') {
-            setAppointments(prev => prev.filter(a => a.id !== payload.old.id))
+            const oldId = (payload.old as { id?: string }).id
+            if (oldId) setAppointments(prev => applyDelete(prev, oldId))
           }
-        }
+        },
       )
       .subscribe()
 
     return () => {
+      cancelled = true
       supabase.removeChannel(channel)
     }
   }, [barberId, date])

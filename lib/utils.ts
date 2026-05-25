@@ -15,8 +15,20 @@ export function formatCurrency(value: number): string {
   }).format(value)
 }
 
+// Datas ISO sem horário (YYYY-MM-DD) são interpretadas como UTC midnight pelo
+// JS — em fusos negativos (BR = UTC-3) isso vira o dia anterior. Tratamos
+// essas strings como datas locais.
+function toLocalDate(date: string | Date): Date {
+  if (date instanceof Date) return date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, d] = date.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  return new Date(date)
+}
+
 export function formatDate(date: string | Date, pattern = "dd 'de' MMMM 'de' yyyy"): string {
-  return format(new Date(date), pattern, { locale: ptBR })
+  return format(toLocalDate(date), pattern, { locale: ptBR })
 }
 
 export function formatDateTime(date: string | Date): string {

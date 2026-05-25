@@ -86,7 +86,7 @@ export default async function LandingPage() {
           <Logo size="lg" className="mx-auto" />
 
           {/* Headline */}
-          <h1 className="text-5xl sm:text-7xl md:text-8xl font-black leading-[0.95] tracking-tight">
+          <h1 className="text-4xl sm:text-6xl md:text-8xl font-black leading-[0.95] tracking-tight">
             Seu estilo,{' '}
             <span className="bg-gold-gradient bg-clip-text text-transparent block sm:inline">
               sem limite.

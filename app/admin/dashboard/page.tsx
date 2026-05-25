@@ -263,7 +263,7 @@ export default async function AdminDashboardPage() {
       </Suspense>
 
       {/* Agenda + Sidebar — buscam em paralelo, renderizam independentemente */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-4 lg:gap-6">
         <div className="lg:col-span-2">
           <Suspense fallback={<ScheduleSkeleton />}>
             <TodaySchedule todayStr={todayStr} />

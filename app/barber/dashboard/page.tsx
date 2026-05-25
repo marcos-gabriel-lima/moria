@@ -92,7 +92,7 @@ export default async function BarberDashboardPage() {
         <KpiCard
           label="Comissão estimada"
           value={formatCurrency(stats.commission)}
-          sub={`${Math.round(stats.commissionRate * 100)}% do faturamento`}
+          sub={`${Math.round(stats.commissionRate)}% do faturamento`}
           icon={Wallet}
           accent
         />

@@ -5,13 +5,23 @@ import { z } from 'zod'
 import { requireAdmin } from './_guard'
 import { productsRepo } from '@/lib/repositories/products'
 import { createAdminClient } from '@/lib/supabase/server'
+import { DomainError, toActionError } from '@/lib/action-error'
+import {
+  detectImageMimeType,
+  validateImageSize,
+  imageRejectionMessage,
+  IMAGE_EXTENSIONS,
+} from '@/lib/image-upload'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 import type { ActionResult } from '@/types'
 
 const productSchema = z.object({
-  name:        z.string().min(2),
-  description: z.string().optional(),
-  price:       z.coerce.number().positive(),
+  name:        z.string().min(2).max(120, 'Nome muito longo'),
+  description: z.string().max(2000, 'Descrição muito longa').optional(),
+  price:       z.coerce.number().positive().max(99_999.99, 'Preço muito alto'),
 })
+
+const idSchema = z.string().uuid('ID inválido')
 
 function revalidateProducts() {
   revalidatePath('/admin/products')
@@ -22,15 +32,23 @@ function revalidateProducts() {
 }
 
 async function uploadImage(adminCli: Awaited<ReturnType<typeof createAdminClient>>, file: File) {
-  const ext      = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-  const filename = `${crypto.randomUUID()}.${ext}`
-  const buffer   = Buffer.from(await file.arrayBuffer())
+  // Check de tamanho ANTES de carregar bytes em memória — defesa contra OOM.
+  const sizeError = validateImageSize(file)
+  if (sizeError) throw new DomainError(imageRejectionMessage(sizeError))
+
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  const mimeType = detectImageMimeType(buffer)
+  if (!mimeType) throw new DomainError(imageRejectionMessage('unsupported_format'))
+
+  const filename = `${crypto.randomUUID()}.${IMAGE_EXTENSIONS[mimeType]}`
 
   const { error } = await adminCli.storage
     .from('product-images')
-    .upload(filename, buffer, { contentType: file.type, upsert: false })
+    .upload(filename, buffer, { contentType: mimeType, upsert: false })
 
-  if (error) throw new Error(`Erro ao fazer upload da imagem: ${error.message}`)
+  // Não anexa error.message (pode vazar config do storage).
+  if (error) throw new DomainError('Erro ao fazer upload da imagem. Tente novamente.')
 
   const { data } = adminCli.storage.from('product-images').getPublicUrl(filename)
   return data.publicUrl
@@ -38,14 +56,18 @@ async function uploadImage(adminCli: Awaited<ReturnType<typeof createAdminClient
 
 export async function createProduct(formData: FormData): Promise<ActionResult<{ id: string }>> {
   try {
-    const { supabase } = await requireAdmin()
+    const { userId, supabase } = await requireAdmin()
+
+    const rl = await checkRateLimit('adminProductUpload', userId, RATE_LIMITS.adminAction)
+    if (!rl.success) throw new DomainError('Muitas ações seguidas. Aguarde 1 minuto.')
 
     const name        = (formData.get('name') as string)?.trim()
     const description = (formData.get('description') as string)?.trim() || undefined
     const price       = parseFloat(formData.get('price') as string)
     const imageFile   = formData.get('image') as File | null
 
-    productSchema.parse({ name, description, price })
+    const parsed = productSchema.safeParse({ name, description, price })
+    if (!parsed.success) throw parsed.error
 
     let image_url: string | null = null
     if (imageFile && imageFile.size > 0) {
@@ -54,9 +76,9 @@ export async function createProduct(formData: FormData): Promise<ActionResult<{ 
     }
 
     const { data, error } = await productsRepo.create(supabase, {
-      name,
-      description: description ?? null,
-      price,
+      name:        parsed.data.name,
+      description: parsed.data.description ?? null,
+      price:       parsed.data.price,
       stock: 0,
       image_url,
     })
@@ -64,8 +86,8 @@ export async function createProduct(formData: FormData): Promise<ActionResult<{ 
 
     revalidateProducts()
     return { success: true, data: { id: data.id } }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -73,12 +95,16 @@ export async function uploadProductImage(
   productId: string,
   formData: FormData
 ): Promise<ActionResult<{ image_url: string }>> {
+  if (!idSchema.safeParse(productId).success) return { success: false, error: 'ID inválido' }
   try {
-    const { supabase } = await requireAdmin()
-    const imageFile = formData.get('image') as File | null
+    const { userId, supabase } = await requireAdmin()
 
+    const rl = await checkRateLimit('adminProductUpload', userId, RATE_LIMITS.adminAction)
+    if (!rl.success) throw new DomainError('Muitas ações seguidas. Aguarde 1 minuto.')
+
+    const imageFile = formData.get('image') as File | null
     if (!imageFile || imageFile.size === 0) {
-      return { success: false, error: 'Nenhum arquivo selecionado' }
+      throw new DomainError('Nenhum arquivo selecionado')
     }
 
     const adminCli = await createAdminClient()
@@ -89,8 +115,8 @@ export async function uploadProductImage(
 
     revalidateProducts()
     return { success: true, data: { image_url } }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -98,23 +124,23 @@ export async function updateProduct(
   id: string,
   formData: { name: string; description?: string; price: number }
 ): Promise<ActionResult> {
+  if (!idSchema.safeParse(id).success) return { success: false, error: 'ID inválido' }
   try {
     const { supabase } = await requireAdmin()
-    const parsed = productSchema.parse(formData)
+    const parsed = productSchema.safeParse(formData)
+    if (!parsed.success) throw parsed.error
     const { error } = await productsRepo.update(supabase, id, {
-      name:        parsed.name,
-      description: parsed.description ?? null,
-      price:       parsed.price,
+      name:        parsed.data.name,
+      description: parsed.data.description ?? null,
+      price:       parsed.data.price,
     })
     if (error) throw error
     revalidateProducts()
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
-
-const idSchema = z.string().uuid('ID inválido')
 
 export async function toggleProductActive(
   productId: string,
@@ -127,8 +153,8 @@ export async function toggleProductActive(
     if (error) throw error
     revalidateProducts()
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -145,7 +171,7 @@ export async function adjustStock(productId: string, delta: number): Promise<Act
     updateTag('products')
     updateTag('admin-products')
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }

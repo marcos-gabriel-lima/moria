@@ -73,16 +73,16 @@ export default async function EditBarberPage({ params }: { params: Promise<{ id:
       </div>
 
       {/* Stats do mês */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           { label: 'Cortes no mês', value: completed.length, icon: Scissors, color: 'text-purple-400' },
           { label: 'Receita bruta',  value: formatCurrency(revenue), icon: TrendingUp, color: 'text-gold-DEFAULT' },
           { label: 'Comissão',       value: formatCurrency(commission), icon: Star, color: 'text-green-400' },
         ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="p-4 rounded-xl bg-moria-surface border border-moria-border">
-            <Icon className={cn('w-5 h-5 mb-2', color)} />
-            <p className="text-xl font-black">{value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+          <div key={label} className="p-3 sm:p-4 rounded-xl bg-moria-surface border border-moria-border">
+            <Icon className={cn('w-4 h-4 sm:w-5 sm:h-5 mb-1.5 sm:mb-2', color)} />
+            <p className="text-base sm:text-xl font-black leading-tight">{value}</p>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 leading-snug">{label}</p>
           </div>
         ))}
       </div>

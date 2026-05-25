@@ -308,12 +308,13 @@ export const getBarberMonthStats = unstable_cache(
         .not('status', 'in', '("cancelled","no_show")'),
     ])
 
-    const commissionRate = barberData?.commission_rate ?? 0.4
+    // commission_rate é PERCENTUAL no BD (0-100). Fallback 40 = 40%, não 0.4.
+    const commissionRate = barberData?.commission_rate ?? 40
     const monthRevenue   = (monthApts ?? []).reduce((s, a) => s + (a.total_price ?? 0), 0)
     const prevRevenue    = (prevApts  ?? []).reduce((s, a) => s + (a.total_price ?? 0), 0)
     const monthCuts      = monthApts?.length ?? 0
     const prevCuts       = prevApts?.length  ?? 0
-    const commission     = monthRevenue * commissionRate
+    const commission     = monthRevenue * (commissionRate / 100)
     const cutsTrend      = prevCuts > 0 ? Math.round(((monthCuts - prevCuts) / prevCuts) * 100) : 0
 
     return {
@@ -386,7 +387,7 @@ export const getAdminReports = unstable_cache(
       { data: appointmentsByStatus },
     ] = await Promise.all([
       supabase.from('payments').select('amount, paid_at').eq('status', 'paid').gte('paid_at', months[0].start),
-      supabase.from('subscriptions').select('plan_id, plan:plans(name), status').eq('status', 'active').gt('expires_at', now.toISOString()),
+      supabase.from('subscriptions').select('plan_id, plan:plans(name, price), status').eq('status', 'active').gt('expires_at', now.toISOString()),
       supabase.from('appointments')
         .select('barber_id, status, total_price, barber:barbers(profile:profiles(full_name))')
         .gte('scheduled_at', new Date(now.getFullYear(), now.getMonth(), 1).toISOString())
@@ -402,10 +403,10 @@ export const getAdminReports = unstable_cache(
         .reduce((sum, p) => sum + p.amount, 0),
     }))
 
-    const planMap: Record<string, { name: string; count: number }> = {}
+    const planMap: Record<string, { name: string; count: number; price: number }> = {}
     ;(subscriptionsByPlan ?? []).forEach((s: any) => {
       const id = s.plan_id
-      if (!planMap[id]) planMap[id] = { name: s.plan?.name ?? id, count: 0 }
+      if (!planMap[id]) planMap[id] = { name: s.plan?.name ?? id, count: 0, price: s.plan?.price ?? 0 }
       planMap[id].count++
     })
 

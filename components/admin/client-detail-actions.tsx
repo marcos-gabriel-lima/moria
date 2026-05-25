@@ -150,11 +150,11 @@ export function ClientDetailActions({
           <div className="flex gap-3 mt-4">
             <button onClick={() => setOpen(null)} className="flex-1 py-2 rounded-lg border border-moria-border text-sm">Cancelar</button>
             <button
-              onClick={() => run(() => grantManualSubscription(clientId, selectedPlan, 30).then(() => { router.refresh() }))}
+              onClick={() => run(() => grantManualSubscription(clientId, selectedPlan, { unit: 'months', value: 1 }).then(() => { router.refresh() }))}
               disabled={isPending || !selectedPlan}
               className="flex-1 py-2 rounded-lg bg-gold-gradient text-black font-bold text-sm hover:opacity-90 disabled:opacity-60"
             >
-              {isPending ? 'Concedendo...' : 'Conceder 30 dias'}
+              {isPending ? 'Concedendo...' : 'Conceder 1 mês'}
             </button>
           </div>
         </Modal>

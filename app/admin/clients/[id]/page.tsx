@@ -50,7 +50,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </Link>
 
       {/* Header do perfil */}
-      <div className="flex items-start justify-between gap-4 p-6 rounded-xl bg-moria-surface border border-moria-border">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 p-4 sm:p-6 rounded-xl bg-moria-surface border border-moria-border">
         <div className="flex items-start gap-4">
           <div className="w-14 h-14 rounded-full bg-moria-elevated border border-moria-border flex items-center justify-center text-xl font-black text-muted-foreground shrink-0">
             {profile.full_name?.charAt(0)}
@@ -90,16 +90,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           { label: 'Total Gasto', value: formatCurrency(totalSpent), icon: Crown, color: 'text-gold-DEFAULT' },
           { label: 'Cortes Realizados', value: completedApts, icon: Scissors, color: 'text-purple-400' },
           { label: 'Agendamentos', value: appointments?.length ?? 0, icon: Calendar, color: 'text-blue-400' },
         ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="p-4 rounded-xl bg-moria-surface border border-moria-border">
-            <Icon className={cn('w-5 h-5 mb-2', color)} />
-            <p className="text-xl font-black">{value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+          <div key={label} className="p-3 sm:p-4 rounded-xl bg-moria-surface border border-moria-border">
+            <Icon className={cn('w-4 h-4 sm:w-5 sm:h-5 mb-1.5 sm:mb-2', color)} />
+            <p className="text-base sm:text-xl font-black leading-tight">{value}</p>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 leading-snug">{label}</p>
           </div>
         ))}
       </div>

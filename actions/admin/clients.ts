@@ -5,7 +5,10 @@ import { z } from 'zod'
 import { requireAdmin } from './_guard'
 import { clientsRepo } from '@/lib/repositories/clients'
 import { subscriptionsRepo } from '@/lib/repositories/subscriptions'
-import type { ActionResult } from '@/types'
+import { sendSubscriptionActiveEmail } from '@/lib/email'
+import { calculateExpiry, isValidBillingPeriod, ONE_MONTH, type BillingPeriod } from '@/lib/billing'
+import { toActionError } from '@/lib/action-error'
+import type { ActionResult, PaymentMethod } from '@/types'
 
 function revalidateClients(id?: string) {
   revalidatePath('/admin/clients')
@@ -23,8 +26,8 @@ export async function toggleClientActive(clientId: string, isActive: boolean): P
     if (error) throw error
     revalidateClients()
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -37,8 +40,8 @@ export async function updateClientNotes(clientId: string, notes: string): Promis
     if (error) throw error
     revalidateClients(clientId)
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -55,34 +58,73 @@ export async function cancelClientSubscription(
     updateTag('admin-kpis')
     updateTag('admin-recent-subs')
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
+  }
+}
+
+const paymentMethodSchema = z.enum(['pix', 'credit_card', 'debit_card', 'cash', 'plan'])
+
+export async function activateSubscription(
+  subscriptionId: string,
+  paymentMethod: PaymentMethod,
+  period: BillingPeriod = ONE_MONTH
+): Promise<ActionResult> {
+  if (!idSchema.safeParse(subscriptionId).success) return { success: false, error: 'ID inválido' }
+  if (!paymentMethodSchema.safeParse(paymentMethod).success) return { success: false, error: 'Método de pagamento inválido' }
+  if (!isValidBillingPeriod(period)) return { success: false, error: 'Duração inválida' }
+
+  try {
+    const { supabase } = await requireAdmin()
+    const now = new Date()
+    const expiresAt = calculateExpiry(now, period)
+
+    const { data, error } = await subscriptionsRepo.activate(supabase, subscriptionId, {
+      started_at:     now.toISOString(),
+      expires_at:     expiresAt.toISOString(),
+      payment_method: paymentMethod,
+    })
+    if (error || !data) throw error ?? new Error('Assinatura não encontrada ou já ativada')
+
+    revalidatePath('/admin/subscriptions')
+    revalidatePath(`/admin/clients/${data.client_id}`)
+    updateTag('admin-kpis')
+    updateTag('admin-recent-subs')
+
+    const client = data.client as any
+    const plan   = data.plan   as any
+    if (client?.id) {
+      const { data: authUser } = await supabase.auth.admin.getUserById(client.id)
+      const email = authUser?.user?.email
+      if (email) {
+        await sendSubscriptionActiveEmail({
+          to:        email,
+          clientName: client.full_name ?? 'Cliente',
+          planName:   plan?.name ?? 'Plano',
+          expiresAt,
+        }).catch(() => {})
+      }
+    }
+
+    return { success: true, data: undefined }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
 export async function grantManualSubscription(
   clientId: string,
   planId: string,
-  daysFromNow: number
+  period: BillingPeriod
 ): Promise<ActionResult> {
-  const grantSchema = {
-    clientId: z.string().uuid(),
-    planId:   z.string().uuid(),
-    days:     z.number().int().min(1).max(365),
-  }
-  const parsed = {
-    clientId: grantSchema.clientId.safeParse(clientId),
-    planId:   grantSchema.planId.safeParse(planId),
-    days:     grantSchema.days.safeParse(daysFromNow),
-  }
-  if (!parsed.clientId.success || !parsed.planId.success || !parsed.days.success) {
-    return { success: false, error: 'Parâmetros inválidos' }
-  }
+  if (!idSchema.safeParse(clientId).success) return { success: false, error: 'ID de cliente inválido' }
+  if (!idSchema.safeParse(planId).success)   return { success: false, error: 'ID de plano inválido' }
+  if (!isValidBillingPeriod(period))         return { success: false, error: 'Duração inválida' }
 
   try {
     const { supabase } = await requireAdmin()
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + daysFromNow * 86_400_000)
+    const expiresAt = calculateExpiry(now, period)
 
     const { error } = await subscriptionsRepo.create(supabase, {
       client_id:     clientId,
@@ -99,7 +141,7 @@ export async function grantManualSubscription(
     updateTag('admin-kpis')
     updateTag('admin-recent-subs')
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }

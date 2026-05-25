@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from 'next/cache'
 import { z } from 'zod'
 import { requireAdmin } from './_guard'
 import { plansRepo } from '@/lib/repositories/plans'
+import { toActionError } from '@/lib/action-error'
 import type { ActionResult } from '@/types'
 
 const planSchema = z.object({
@@ -34,8 +35,8 @@ export async function createPlan(formData: PlanInput): Promise<ActionResult<{ id
     if (error) throw error
     revalidatePlans()
     return { success: true, data: { id: data.id } }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -52,8 +53,8 @@ export async function updatePlan(
     if (error) throw error
     revalidatePlans()
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
 
@@ -65,7 +66,7 @@ export async function togglePlanActive(planId: string, isActive: boolean): Promi
     if (error) throw error
     revalidatePlans()
     return { success: true, data: undefined }
-  } catch (e: any) {
-    return { success: false, error: e.message }
+  } catch (e) {
+    return { success: false, error: toActionError(e) }
   }
 }
