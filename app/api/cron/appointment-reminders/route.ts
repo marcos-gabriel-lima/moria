@@ -1,22 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { timingSafeEqual } from 'node:crypto'
+import { createAdminClient } from '@/lib/supabase/server'
 import { sendAppointmentReminderEmail } from '@/lib/email'
-import { addDays, startOfDay, endOfDay } from 'date-fns'
+import { dayRangeBR } from '@/lib/timezone-br'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+/**
+ * Compara secrets em constant time pra evitar timing attacks.
+ * Retorna false se os tamanhos diferirem (sem fazer timing leak).
+ */
+function constantTimeEqual(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
+
 export async function GET(req: NextRequest) {
-  const secret = req.headers.get('x-cron-secret')
-  if (secret !== process.env.CRON_SECRET) {
+  const secret = req.headers.get('x-cron-secret') ?? ''
+  const expected = process.env.CRON_SECRET ?? ''
+  if (!expected || !constantTimeEqual(secret, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const supabase = await createClient()
-    const tomorrow  = addDays(new Date(), 1)
-    const dayStart  = startOfDay(tomorrow).toISOString()
-    const dayEnd    = endOfDay(tomorrow).toISOString()
+    // CRITICO: precisa de service_role pra usar auth.admin.* abaixo.
+    // O cliente anon (createClient) não tem permissão pra getUserById.
+    const supabase = await createAdminClient()
+
+    // "Amanhã BR" — antes usávamos UTC, deslocando 3h. Agendamentos das
+    // últimas 3h do dia BR ficavam sem lembrete.
+    const { start: dayStart, end: dayEnd } = dayRangeBR(new Date(), 1)
 
     const { data: appointments, error } = await supabase
       .from('appointments')
@@ -35,15 +52,15 @@ export async function GET(req: NextRequest) {
     if (error) throw error
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-    let sent = 0, failed = 0
+    let sent = 0, failed = 0, skipped = 0
 
     for (const apt of appointments ?? []) {
       const client = apt.client as any
-      if (!client?.id) continue
+      if (!client?.id) { skipped++; continue }
 
       const { data: authUser } = await supabase.auth.admin.getUserById(client.id)
       const email = authUser?.user?.email
-      if (!email) continue
+      if (!email) { skipped++; continue }
 
       const barber      = apt.barber      as any
       const services    = apt.services    as any[]
@@ -65,8 +82,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true, sent, failed })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+    return NextResponse.json({ ok: true, sent, failed, skipped })
+  } catch (e: unknown) {
+    // Log pra debug, mas NÃO vaza message no response.
+    console.error('[cron/appointment-reminders]', e)
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

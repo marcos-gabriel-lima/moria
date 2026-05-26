@@ -53,6 +53,19 @@ export function endOfMonthBR(now: Date): string {
 }
 
 /**
+ * Início e fim de um mês BR a partir de (ano, mês). `month` é 1-12 (não 0-11).
+ *
+ * Útil pra filtros de histórico onde o usuário escolheu um mês específico
+ * num dropdown — em vez de calcular "N meses atrás" da data atual.
+ */
+export function monthRangeBRFromYearMonth(year: number, month: number): { start: string; end: string } {
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1, -BR_OFFSET_HOURS, 0, 0)).toISOString(),
+    end:   new Date(Date.UTC(year, month,     1, -BR_OFFSET_HOURS, 0, 0) - 1).toISOString(),
+  }
+}
+
+/**
  * Início e fim do mês N meses atrás em BR.
  */
 export function monthRangeBR(now: Date, monthsAgo = 0): { start: string; end: string } {
@@ -62,6 +75,24 @@ export function monthRangeBR(now: Date, monthsAgo = 0): { start: string; end: st
   return {
     start: new Date(Date.UTC(year, month,     1, -BR_OFFSET_HOURS, 0, 0)).toISOString(),
     end:   new Date(Date.UTC(year, month + 1, 1, -BR_OFFSET_HOURS, 0, 0) - 1).toISOString(),
+  }
+}
+
+/**
+ * Início e fim de um dia em BR (com offset opcional em dias).
+ *
+ * Ex.: `dayRangeBR(now, 1)` → range do "amanhã BR" como ISO UTC.
+ *      `dayRangeBR(now, 0)` → range do "hoje BR".
+ *      `dayRangeBR(now, -1)` → range do "ontem BR".
+ */
+export function dayRangeBR(now: Date, daysOffset = 0): { start: string; end: string } {
+  const br = asBrFields(now)
+  const year  = br.getUTCFullYear()
+  const month = br.getUTCMonth()
+  const day   = br.getUTCDate() + daysOffset
+  return {
+    start: new Date(Date.UTC(year, month, day,     -BR_OFFSET_HOURS, 0, 0)).toISOString(),
+    end:   new Date(Date.UTC(year, month, day + 1, -BR_OFFSET_HOURS, 0, 0) - 1).toISOString(),
   }
 }
 

@@ -200,6 +200,34 @@ describe('generateTimeSlots', () => {
     expect(slot1230?.isBlocked).toBe(true)
   })
 
+  it('🛡️ maxBookingDate: slots após o cap ficam indisponíveis', () => {
+    // Cap às 12:00 — slots 12:30+ devem estar bloqueados
+    const cap = new Date('2026-05-25T12:00:00')
+    const slots = generateTimeSlots(date, [], [], 8, 18, 30, cap)
+    expect(slots.find(s => s.time === '11:30')?.available).toBe(true)
+    expect(slots.find(s => s.time === '12:30')?.available).toBe(false)
+    expect(slots.find(s => s.time === '12:30')?.isBlocked).toBe(true)
+    expect(slots.find(s => s.time === '17:30')?.available).toBe(false)
+  })
+
+  it('🐛 REGRESSÃO 48h — não-assinante: slots além de 48h ficam indisponíveis', () => {
+    // Cenário: hoje 26/mai 22h, calendário mostra 28/mai
+    // Slot 28/mai 23h é 49h depois → DEVE estar indisponível
+    vi.setSystemTime(new Date('2026-05-26T22:00:00'))
+    const targetDate  = new Date('2026-05-28T12:00:00')
+    const cap48hAhead = new Date('2026-05-28T22:00:00') // exatamente +48h
+    const slots = generateTimeSlots(targetDate, [], [], 8, 24, 30, cap48hAhead)
+    expect(slots.find(s => s.time === '21:30')?.available).toBe(true)
+    expect(slots.find(s => s.time === '22:30')?.available).toBe(false)
+    expect(slots.find(s => s.time === '23:30')?.available).toBe(false)
+  })
+
+  it('sem maxBookingDate (assinante): nenhum slot é capado', () => {
+    const slots = generateTimeSlots(date, [], [], 8, 18)
+    // Todos disponíveis (sem appointments, sem blocked)
+    expect(slots.every(s => s.available)).toBe(true)
+  })
+
   it('agendamento longo (60min) bloqueia 2 slots consecutivos', () => {
     const apt: Partial<Appointment> = {
       scheduled_at: '2026-05-25T14:00:00',

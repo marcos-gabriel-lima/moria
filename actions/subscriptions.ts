@@ -29,17 +29,30 @@ export async function subscribeToPlan(
 
   const { plan_id } = parsed.data
 
-  const { data: plan } = await supabase
-    .from('plans')
-    .select('*')
-    .eq('id', plan_id)
-    .eq('is_active', true)
-    .single()
+  // Em paralelo: valida plano ativo + checa se cliente já tem pending.
+  const [{ data: plan }, { data: existingPending }] = await Promise.all([
+    supabase.from('plans').select('id').eq('id', plan_id).eq('is_active', true).maybeSingle(),
+    supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('client_id', user.id)
+      .eq('status', 'pending')
+      .maybeSingle(),
+  ])
 
   if (!plan) return { success: false, error: 'Plano não encontrado' }
 
+  if (existingPending) {
+    return {
+      success: false,
+      error: 'Você já tem uma solicitação pendente. Aguarde a confirmação do admin antes de pedir outra.',
+    }
+  }
+
   // Cria como 'pending' — admin ativa manualmente após confirmar pagamento.
   // started_at/expires_at são definidos na ativação (ver activateSubscription).
+  // Defesa em profundidade: índice unique `subscriptions_one_pending_per_client`
+  // garante atomicidade caso 2 requests cheguem no mesmo instante.
   const { data: subscription, error } = await supabase
     .from('subscriptions')
     .insert({
@@ -51,7 +64,17 @@ export async function subscribeToPlan(
     .select('*, plan:plans(*)')
     .single()
 
-  if (error) return { success: false, error: 'Erro ao criar solicitação de assinatura' }
+  if (error) {
+    // 23505 = unique_violation. Significa que entre o pre-check e o INSERT,
+    // outra request criou a pending. Tratamos como "já existe pendente".
+    if (error.code === '23505') {
+      return {
+        success: false,
+        error: 'Você já tem uma solicitação pendente. Aguarde a confirmação do admin.',
+      }
+    }
+    return { success: false, error: 'Erro ao criar solicitação de assinatura' }
+  }
 
   revalidatePath('/plans')
   revalidatePath('/wallet')
@@ -83,9 +106,15 @@ export async function cancelSubscription(
 
   if (!sub) return { success: false, error: 'Assinatura não encontrada' }
   if (sub.client_id !== user.id) return { success: false, error: 'Sem permissão' }
-  if (sub.status !== 'active') return { success: false, error: 'Assinatura não está ativa' }
 
-  const { error } = await supabase
+  // Cliente pode cancelar a própria assinatura ATIVA ou uma solicitação PENDING.
+  // (Antes só permitia 'active' — se solicitou por engano, tinha que pedir pro admin.)
+  if (!['active', 'pending'].includes(sub.status)) {
+    return { success: false, error: 'Esta assinatura não pode ser cancelada' }
+  }
+
+  // UPDATE com filtro de status atômico — fecha race condition entre SELECT e UPDATE.
+  const { data: cancelResult, error } = await supabase
     .from('subscriptions')
     .update({
       status: 'cancelled',
@@ -94,8 +123,12 @@ export async function cancelSubscription(
       auto_renew: false,
     })
     .eq('id', subscriptionId)
+    .in('status', ['active', 'pending'])
+    .select('id')
+    .maybeSingle()
 
   if (error) return { success: false, error: 'Erro ao cancelar assinatura' }
+  if (!cancelResult) return { success: false, error: 'Esta assinatura não pode ser cancelada' }
 
   revalidatePath('/wallet')
   revalidatePath('/plans')

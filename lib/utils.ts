@@ -45,14 +45,18 @@ export function getWhatsAppUrl(phone: string, message?: string): string {
   return `https://wa.me/55${cleaned}${msg}`
 }
 
-// Gera slots de 30min entre startHour e endHour
+// Gera slots de 30min entre startHour e endHour.
+//
+// `maxBookingDate`: opcional. Slots APÓS essa data ficam indisponíveis
+// (usado pra aplicar regra dos 48h ao não-assinante já no front).
 export function generateTimeSlots(
   date: Date,
   appointments: Appointment[],
   blockedSlots: { starts_at: string; ends_at: string }[],
   startHour = 8,
   endHour = 18,
-  slotDuration = 30
+  slotDuration = 30,
+  maxBookingDate?: Date,
 ): TimeSlot[] {
   const slots: TimeSlot[] = []
   let current = setMinutes(setHours(date, startHour), 0)
@@ -62,6 +66,7 @@ export function generateTimeSlots(
   while (isBefore(current, end)) {
     const slotEnd = addMinutes(current, slotDuration)
     const isPast = isBefore(current, now)
+    const isAfterCap = maxBookingDate ? isAfter(current, maxBookingDate) : false
 
     const isBooked = appointments.some(apt => {
       if (['cancelled', 'no_show'].includes(apt.status)) return false
@@ -81,8 +86,8 @@ export function generateTimeSlots(
     slots.push({
       time: format(current, 'HH:mm'),
       datetime: new Date(current),
-      available: !isPast && !isBooked && !isBlocked,
-      isBlocked: isBlocked || isPast,
+      available: !isPast && !isBooked && !isBlocked && !isAfterCap,
+      isBlocked: isBlocked || isPast || isAfterCap,
     })
 
     current = addMinutes(current, slotDuration)

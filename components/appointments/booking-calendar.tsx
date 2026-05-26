@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
-import { addDays, format, isSameDay, startOfToday, addHours } from 'date-fns'
+import { useEffect, useState } from 'react'
+import { addDays, addHours, format, isSameDay, startOfToday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react'
 import { cn, generateTimeSlots } from '@/lib/utils'
@@ -13,8 +13,14 @@ interface BookingCalendarProps {
   blockedSlots: { starts_at: string; ends_at: string }[]
   isSubscriber: boolean
   onSelectSlot: (datetime: Date) => void
+  onDateChange?: (date: Date) => void
   selectedSlot: Date | null
 }
+
+// Não-assinante: regra real de 48h CORRIDAS a partir de agora,
+// não "2 dias do calendário" (que dava brecha em horas tardias do dia).
+const NON_SUBSCRIBER_BOOKING_HOURS_AHEAD = 48
+const SUBSCRIBER_BOOKING_DAYS_AHEAD     = 60
 
 export function BookingCalendar({
   barber,
@@ -22,17 +28,27 @@ export function BookingCalendar({
   blockedSlots,
   isSubscriber,
   onSelectSlot,
+  onDateChange,
   selectedSlot,
 }: BookingCalendarProps) {
   const today = startOfToday()
   const [currentDate, setCurrentDate] = useState(today)
   const [slots, setSlots] = useState<TimeSlot[]>([])
 
-  const maxDate = isSubscriber
-    ? addDays(today, 60)  // Assinante: 60 dias de antecedência
-    : addDays(today, 2)   // Não-assinante: 48h (2 dias)
+  // Cap real de horas. Pra UX do calendário (selecionar dia), arredondamos pro
+  // último dia que tem AO MENOS UM slot disponível.
+  const now = new Date()
+  const maxBookingDate = isSubscriber
+    ? addDays(today, SUBSCRIBER_BOOKING_DAYS_AHEAD)
+    : addHours(now, NON_SUBSCRIBER_BOOKING_HOURS_AHEAD)
 
   const minDate = today
+
+  // Avisa o parent quando muda o dia visualizado — pra parent re-fetchar
+  // appointments e blocked-slots desse dia.
+  useEffect(() => {
+    onDateChange?.(currentDate)
+  }, [currentDate, onDateChange])
 
   useEffect(() => {
     const daySlots = generateTimeSlots(
@@ -43,9 +59,14 @@ export function BookingCalendar({
       blockedSlots,
       parseInt(barber.start_time?.split(':')[0] ?? '8'),
       parseInt(barber.end_time?.split(':')[0] ?? '18'),
+      30,
+      maxBookingDate,
     )
     setSlots(daySlots)
-  }, [currentDate, appointments, blockedSlots, barber])
+  // maxBookingDate deriva de `now` que muda a cada render — não incluímos
+  // nas deps. O recálculo já acontece quando muda data/barbeiro/dados.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate, appointments, blockedSlots, barber, isSubscriber])
 
   const prevDay = () => {
     const prev = addDays(currentDate, -1)
@@ -54,7 +75,8 @@ export function BookingCalendar({
 
   const nextDay = () => {
     const next = addDays(currentDate, 1)
-    if (next <= maxDate) setCurrentDate(next)
+    // Só permite navegar pra um dia que ainda contém slots válidos
+    if (next <= maxBookingDate) setCurrentDate(next)
   }
 
   const availableCount = slots.filter(s => s.available).length
@@ -93,7 +115,7 @@ export function BookingCalendar({
 
         <button
           onClick={nextDay}
-          disabled={isSameDay(currentDate, maxDate)}
+          disabled={addDays(currentDate, 1) > maxBookingDate}
           className="min-w-[40px] min-h-[40px] p-2 rounded-md hover:bg-moria-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
         >
           <ChevronRight className="w-5 h-5" />

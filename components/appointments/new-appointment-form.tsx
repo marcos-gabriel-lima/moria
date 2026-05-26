@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { format } from 'date-fns'
-import { User, Scissors, Check, Calendar, AlertCircle } from 'lucide-react'
+import { format, startOfToday } from 'date-fns'
+import { User, Check, AlertCircle } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { BookingCalendar } from './booking-calendar'
 import { createAppointment, getAvailableSlots } from '@/actions/appointments'
@@ -24,25 +24,31 @@ export function NewAppointmentForm({ barbers, services, subscription }: NewAppoi
   const [selectedBarber, setSelectedBarber] = useState<typeof barbers[0] | null>(null)
   const [selectedServices, setSelectedServices] = useState<string[]>([])
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null)
+  const [calendarDate, setCalendarDate] = useState<Date>(startOfToday())
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [blockedSlots, setBlockedSlots] = useState<{ starts_at: string; ends_at: string }[]>([])
 
   const isSubscriber = !!subscription
   const plan = subscription?.plan as { includes_cut: boolean; includes_beard: boolean } | null
 
-  // Ao selecionar barbeiro + data, buscar horários ocupados
+  // Busca horários ocupados ao mudar barbeiro OU data visualizada.
+  // Antes, esse effect dependia de `selectedSlot` — só rodava DEPOIS que o
+  // usuário escolhia um slot, deixando o calendário pintar tudo como livre.
   useEffect(() => {
-    if (!selectedBarber || !selectedSlot) return
-    const dateStr = format(selectedSlot, 'yyyy-MM-dd')
+    if (!selectedBarber) return
+    const dateStr = format(calendarDate, 'yyyy-MM-dd')
+    let cancelled = false
     getAvailableSlots(selectedBarber.id, dateStr).then(res => {
-      if (res.success) {
-        setAppointments(
-          res.data.slots.map(s => ({ scheduled_at: s, duration_minutes: 30 } as Appointment))
-        )
-        setBlockedSlots(res.data.blocked)
-      }
+      if (cancelled || !res.success) return
+      setAppointments(
+        res.data.slots.map(s => ({ scheduled_at: s, duration_minutes: 30 } as Appointment))
+      )
+      setBlockedSlots(res.data.blocked)
     })
-  }, [selectedBarber, selectedSlot])
+    return () => { cancelled = true }
+  }, [selectedBarber, calendarDate])
+
+  const handleDateChange = useCallback((d: Date) => setCalendarDate(d), [])
 
   const toggleService = (id: string) => {
     setSelectedServices(prev =>
@@ -207,6 +213,7 @@ export function NewAppointmentForm({ barbers, services, subscription }: NewAppoi
             blockedSlots={blockedSlots}
             isSubscriber={isSubscriber}
             onSelectSlot={setSelectedSlot}
+            onDateChange={handleDateChange}
             selectedSlot={selectedSlot}
           />
 

@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { buildIlikeOr } from '@/lib/postgrest-escape'
 import {
   monthRangeBR,
+  monthRangeBRFromYearMonth,
   startOfDayBR,
   endOfDayBR,
 } from '@/lib/timezone-br'
@@ -358,8 +359,8 @@ export const getBarberHistory = unstable_cache(
     if (status && status !== 'all') qb = qb.eq('status', status)
     if (month) {
       const [y, m] = month.split('-').map(Number)
-      const start  = new Date(y, m - 1, 1).toISOString()
-      const end    = new Date(y, m, 0, 23, 59, 59).toISOString()
+      // Range em horário BR (não UTC server) — alinhado com getAdminReports etc.
+      const { start, end } = monthRangeBRFromYearMonth(y, m)
       qb = qb.gte('scheduled_at', start).lte('scheduled_at', end)
     }
 
