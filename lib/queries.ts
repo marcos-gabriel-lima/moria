@@ -1,6 +1,11 @@
 import { unstable_cache } from 'next/cache'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { buildIlikeOr } from '@/lib/postgrest-escape'
+import {
+  monthRangeBR,
+  startOfDayBR,
+  endOfDayBR,
+} from '@/lib/timezone-br'
 
 // Cliente anon — para dados públicos (plans, services, products, barbers)
 function db() {
@@ -81,10 +86,10 @@ export const getAdminKPIs = unstable_cache(
   async () => {
     const supabase = adminDb()
     const now = new Date()
-    const monthStart = startOfMonth(now).toISOString()
-    const monthEnd   = endOfMonth(now).toISOString()
-    const prevStart  = startOfMonth(subMonths(now, 1)).toISOString()
-    const prevEnd    = endOfMonth(subMonths(now, 1)).toISOString()
+    // Períodos calculados em horário BR — relatórios devem refletir o "mês"
+    // como o dono da barbearia entende (não o mês UTC do servidor).
+    const { start: monthStart, end: monthEnd } = monthRangeBR(now, 0)
+    const { start: prevStart,  end: prevEnd  } = monthRangeBR(now, 1)
 
     const [
       { count: totalClients },
@@ -171,7 +176,10 @@ export const getAdminClients = unstable_cache(
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1)
 
-      if (query) qb = qb.or(`full_name.ilike.%${query}%,phone.ilike.%${query}%,whatsapp.ilike.%${query}%`)
+      if (query) {
+        const orClause = buildIlikeOr(['full_name', 'phone', 'whatsapp'], query)
+        if (orClause) qb = qb.or(orClause)
+      }
 
       const { data, count } = await qb
       return { clients: data ?? [], count: count ?? 0 }
@@ -198,10 +206,9 @@ export const getAdminClients = unstable_cache(
 
 export const getAdminBarbers = unstable_cache(
   async () => {
-    const supabase   = adminDb()
-    const now        = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
+    const supabase = adminDb()
+    const now      = new Date()
+    const { start: monthStart, end: monthEnd } = monthRangeBR(now, 0)
 
     const [{ data: barbers }, { data: monthCounts }] = await Promise.all([
       supabase
@@ -270,13 +277,12 @@ export const getAdminProducts = unstable_cache(
 
 export const getBarberMonthStats = unstable_cache(
   async (barberId: string) => {
-    const supabase   = adminDb()
-    const now        = new Date()
-    const today      = now.toISOString().split('T')[0]
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
-    const prevStart  = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-    const prevEnd    = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString()
+    const supabase = adminDb()
+    const now      = new Date()
+    const { start: monthStart, end: monthEnd } = monthRangeBR(now, 0)
+    const { start: prevStart,  end: prevEnd  } = monthRangeBR(now, 1)
+    const dayStart = startOfDayBR(now)
+    const dayEnd   = endOfDayBR(now)
 
     const [
       { data: barberData },
@@ -303,8 +309,8 @@ export const getBarberMonthStats = unstable_cache(
         .from('appointments')
         .select('*', { count: 'exact', head: true })
         .eq('barber_id', barberId)
-        .gte('scheduled_at', `${today}T00:00:00.000Z`)
-        .lte('scheduled_at', `${today}T23:59:59.999Z`)
+        .gte('scheduled_at', dayStart)
+        .lte('scheduled_at', dayEnd)
         .not('status', 'in', '("cancelled","no_show")'),
     ])
 
@@ -372,13 +378,22 @@ export const getAdminReports = unstable_cache(
     const now = new Date()
 
     const months = Array.from({ length: monthsBack }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const { start, end } = monthRangeBR(now, i)
+      // Pra label, usamos a string da meia-noite UTC do start (que ainda é
+      // dentro do mês BR correspondente). Funciona pra rotulagem PT-BR.
+      const labelDate = new Date(start)
       return {
-        label: d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
-        start: new Date(d.getFullYear(), d.getMonth(), 1).toISOString(),
-        end:   new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).toISOString(),
+        label: labelDate.toLocaleDateString('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          month: 'short',
+          year: '2-digit',
+        }),
+        start,
+        end,
       }
     }).reverse()
+
+    const currentMonth = monthRangeBR(now, 0)
 
     const [
       { data: payments },
@@ -390,10 +405,10 @@ export const getAdminReports = unstable_cache(
       supabase.from('subscriptions').select('plan_id, plan:plans(name, price), status').eq('status', 'active').gt('expires_at', now.toISOString()),
       supabase.from('appointments')
         .select('barber_id, status, total_price, barber:barbers(profile:profiles(full_name))')
-        .gte('scheduled_at', new Date(now.getFullYear(), now.getMonth(), 1).toISOString())
-        .lte('scheduled_at', new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()),
+        .gte('scheduled_at', currentMonth.start)
+        .lte('scheduled_at', currentMonth.end),
       supabase.from('appointments').select('status')
-        .gte('scheduled_at', new Date(now.getFullYear(), now.getMonth(), 1).toISOString()),
+        .gte('scheduled_at', currentMonth.start),
     ])
 
     const revenueByMonth = months.map(m => ({
