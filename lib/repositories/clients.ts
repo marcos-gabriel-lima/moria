@@ -35,8 +35,14 @@ export const clientsRepo = {
       .eq('role', 'client')
   },
 
+  /**
+   * Atualiza notas internas do admin sobre um cliente.
+   * Filtro `.eq('role', 'client')` é defesa em profundidade — RLS já barra,
+   * mas garantimos aqui que admin não use updateNotes pra escrever em
+   * profiles de barbeiro/admin por engano.
+   */
   async updateNotes(db: Db, id: string, notes: string) {
-    return db.from('profiles').update({ notes }).eq('id', id)
+    return db.from('profiles').update({ notes }).eq('id', id).eq('role', 'client')
   },
 
   async updateProfile(db: Db, id: string, dto: UpdateProfileDto) {

@@ -1,4 +1,3 @@
-export * from './appointments'
 export * from './barbers'
 export * from './clients'
 export * from './plans'

@@ -40,14 +40,16 @@ export const productsRepo = {
     return db.from('products').update({ is_active: isActive }).eq('id', id)
   },
 
+  /**
+   * Ajuste de estoque ATÔMICO via função SQL `adjust_product_stock`.
+   *
+   * Antes, fazíamos read-then-write em JS — sujeito a race condition entre
+   * vendas/ajustes simultâneos. Agora o UPDATE acontece dentro de um único
+   * statement que o Postgres serializa naturalmente.
+   *
+   * Requer migration: supabase/migrations/20260525000001_atomic_stock_adjustment.sql
+   */
   async adjustStock(db: Db, id: string, delta: number) {
-    const { data, error } = await db
-      .from('products')
-      .select('stock')
-      .eq('id', id)
-      .single()
-    if (error) return { data: null, error }
-    const newStock = Math.max(0, data.stock + delta)
-    return db.from('products').update({ stock: newStock }).eq('id', id)
+    return db.rpc('adjust_product_stock', { p_id: id, p_delta: delta })
   },
 } as const
