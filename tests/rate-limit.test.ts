@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { resolveFailureResult, RATE_LIMITS } from '@/lib/rate-limit'
+import { resolveFailureResult, checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
-describe('resolveFailureResult — comportamento quando Redis cai', () => {
+describe('resolveFailureResult — comportamento quando Redis configurado mas falha em runtime', () => {
   it('🟢 fail-open (default) → success: true', () => {
     const result = resolveFailureResult({ requests: 10, window: '1 m' })
     expect(result.success).toBe(true)
@@ -12,7 +12,7 @@ describe('resolveFailureResult — comportamento quando Redis cai', () => {
     expect(result.success).toBe(true)
   })
 
-  it('🔴 fail-closed → success: false (BLOQUEIA)', () => {
+  it('🔴 fail-closed → success: false (BLOQUEIA durante outage do Redis)', () => {
     const result = resolveFailureResult({ requests: 10, window: '1 m', failMode: 'closed' })
     expect(result.success).toBe(false)
   })
@@ -67,20 +67,29 @@ describe('RATE_LIMITS — configs pré-definidas', () => {
   })
 })
 
-describe('integração: fail-closed + checkRateLimit (sem Redis configurado)', () => {
-  // Verifica que sem Redis configurado (cenário comum em dev), endpoints
-  // de auth NÃO deixam passar — comportamento fail-closed real.
-  //
-  // OBS: o test depende de UPSTASH_REDIS_REST_URL não estar setada no env de
-  // teste. Se estiver, o test continua passando porque o limit() pode tentar
-  // de verdade — mas o cenário "sem Redis" é o que queremos validar aqui.
-  it('🛡️ resolveFailureResult de auth (closed) NÃO permite passar', () => {
-    const result = resolveFailureResult(RATE_LIMITS.auth)
-    expect(result.success).toBe(false)
+describe('checkRateLimit — sem Redis configurado (env vars ausentes)', () => {
+  // Pré-condição: estes testes assumem que UPSTASH_REDIS_REST_URL/TOKEN
+  // não estão setadas no ambiente de teste (caso típico).
+
+  it('🐛 REGRESSÃO — sem Redis, auth (fail-closed) DEVE passar (não bloquear signup)', async () => {
+    // Bug: antes, fail-closed bloqueava mesmo sem Redis configurado, quebrando
+    // signup/signin em deploys sem Upstash. Configuração ausente != "outage".
+    const result = await checkRateLimit('test-signup', 'user-123', RATE_LIMITS.auth)
+    expect(result.success).toBe(true)
   })
 
-  it('🟢 resolveFailureResult de createBooking (open) permite passar', () => {
-    const result = resolveFailureResult(RATE_LIMITS.createBooking)
+  it('sem Redis, qrVerify (fail-closed) também passa', async () => {
+    const result = await checkRateLimit('test-qr', 'user-123', RATE_LIMITS.qrVerify)
     expect(result.success).toBe(true)
+  })
+
+  it('sem Redis, createBooking (fail-open) passa (igual ao caso closed)', async () => {
+    const result = await checkRateLimit('test-booking', 'user-123', RATE_LIMITS.createBooking)
+    expect(result.success).toBe(true)
+  })
+
+  it('remaining retorna config.requests quando passa direto (sem Redis)', async () => {
+    const result = await checkRateLimit('test-x', 'user-123', RATE_LIMITS.auth)
+    expect(result.remaining).toBe(5) // config.auth.requests
   })
 })

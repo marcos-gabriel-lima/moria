@@ -141,10 +141,10 @@ export default async function BarberHistoryPage({
               <div
                 key={apt.id}
                 className={cn(
-                  'rounded-xl border p-4 space-y-2.5',
+                  'rounded-xl border border-l-4 p-4 space-y-2.5',
                   apt.is_subscriber
-                    ? 'border-gold-DEFAULT/30 bg-gradient-to-r from-gold-DEFAULT/5 to-moria-surface'
-                    : 'border-moria-border bg-moria-surface'
+                    ? 'border-gold-DEFAULT/40 border-l-gold-DEFAULT bg-gradient-to-r from-gold-DEFAULT/10 to-moria-surface'
+                    : 'border-moria-border border-l-moria-border bg-moria-surface'
                 )}
               >
                 <div className="flex items-start justify-between gap-2">

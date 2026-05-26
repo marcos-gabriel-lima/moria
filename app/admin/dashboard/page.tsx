@@ -76,7 +76,20 @@ async function TodaySchedule({ todayStr }: { todayStr: string }) {
           <p className="text-muted-foreground text-sm">Nenhum agendamento hoje</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <>
+          {/* Legenda */}
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-1 h-4 rounded-sm bg-gold-DEFAULT" />
+              Assinante
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-1 h-4 rounded-sm bg-moria-border" />
+              Avulso
+            </span>
+          </div>
+
+          <div className="space-y-2">
           {todaySchedule.map(apt => {
             const client   = apt.client   as any
             const barber   = apt.barber   as any
@@ -87,10 +100,10 @@ async function TodaySchedule({ todayStr }: { todayStr: string }) {
               <div
                 key={apt.id}
                 className={cn(
-                  'flex items-center gap-4 p-4 rounded-xl bg-moria-surface border transition-colors',
+                  'flex items-center gap-4 p-4 rounded-xl border border-l-4 transition-colors',
                   (apt as any).is_subscriber
-                    ? 'border-gold-DEFAULT/30 hover:border-gold-DEFAULT/50'
-                    : 'border-moria-border hover:border-moria-border/80'
+                    ? 'border-gold-DEFAULT/40 border-l-gold-DEFAULT bg-gradient-to-r from-gold-DEFAULT/10 to-moria-surface hover:border-gold-DEFAULT/60'
+                    : 'border-moria-border border-l-moria-border bg-moria-surface hover:border-moria-border/80'
                 )}
               >
                 <div className="text-sm font-black text-gold-DEFAULT w-12 shrink-0">
@@ -99,9 +112,14 @@ async function TodaySchedule({ todayStr }: { todayStr: string }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-sm">{client?.full_name}</p>
-                    {(apt as any).is_subscriber && (
-                      <span className="text-[10px] text-gold-DEFAULT bg-gold-DEFAULT/10 border border-gold-DEFAULT/20 px-1.5 py-0.5 rounded-full font-semibold">
-                        ✦ Assinante
+                    {(apt as any).is_subscriber ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-gold-DEFAULT bg-gold-DEFAULT/15 border border-gold-DEFAULT/40 px-1.5 py-0.5 rounded-full font-semibold uppercase tracking-wide">
+                        <Crown className="w-2.5 h-2.5" />
+                        Assinante
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground bg-moria-elevated border border-moria-border px-1.5 py-0.5 rounded-full font-medium uppercase tracking-wide">
+                        Avulso
                       </span>
                     )}
                   </div>
@@ -127,7 +145,8 @@ async function TodaySchedule({ todayStr }: { todayStr: string }) {
               </div>
             )
           })}
-        </div>
+          </div>
+        </>
       )}
     </div>
   )

@@ -41,9 +41,10 @@ export function AppointmentCard({
   return (
     <div
       className={cn(
-        'rounded-xl border p-4 bg-moria-surface transition-all',
-        apt.is_subscriber && 'border-gold-DEFAULT/30 shadow-[0_0_12px_rgba(201,168,76,0.08)]',
-        !apt.is_subscriber && 'border-moria-border',
+        'rounded-xl border border-l-4 p-4 transition-all',
+        apt.is_subscriber
+          ? 'border-gold-DEFAULT/40 border-l-gold-DEFAULT bg-gradient-to-r from-gold-DEFAULT/10 to-moria-surface shadow-[0_0_12px_rgba(201,168,76,0.08)]'
+          : 'border-moria-border border-l-moria-border bg-moria-surface',
         apt.status === 'cancelled' && 'opacity-60'
       )}
     >

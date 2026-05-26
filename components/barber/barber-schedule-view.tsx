@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format, addDays, subDays } from 'date-fns'
-import { ChevronLeft, ChevronRight, Clock, User, Check, MessageCircle, Ban, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, User, Check, MessageCircle, Ban, Trash2, Crown } from 'lucide-react'
 import { cn, formatCurrency, getWhatsAppUrl } from '@/lib/utils'
 import { SubscriberBadge } from '@/components/shared/subscriber-badge'
 import { completeAppointment } from '@/actions/appointments'
@@ -80,8 +80,18 @@ export function BarberScheduleView({ appointments, blockedSlots, currentDate, ba
         </button>
       </div>
 
-      {/* Botão bloquear horário */}
-      <div className="flex justify-end">
+      {/* Botão bloquear horário + legenda */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-1 h-4 rounded-sm bg-gold-DEFAULT" />
+            Assinante
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-1 h-4 rounded-sm bg-moria-border" />
+            Avulso
+          </span>
+        </div>
         <BlockSlotButton currentDate={currentDate} onSuccess={() => router.refresh()} />
       </div>
 
@@ -132,10 +142,10 @@ export function BarberScheduleView({ appointments, blockedSlots, currentDate, ba
             <div
               key={`apt-${apt.id}`}
               className={cn(
-                'rounded-xl border p-4 space-y-3 transition-all',
+                'rounded-xl border border-l-4 p-4 space-y-3 transition-all',
                 apt.is_subscriber
-                  ? 'border-gold-DEFAULT/40 bg-gradient-to-r from-gold-DEFAULT/5 to-moria-surface'
-                  : 'border-moria-border bg-moria-surface',
+                  ? 'border-gold-DEFAULT/40 border-l-gold-DEFAULT bg-gradient-to-r from-gold-DEFAULT/10 to-moria-surface'
+                  : 'border-moria-border border-l-moria-border bg-moria-surface',
                 isCompleted && 'opacity-50'
               )}
             >
@@ -146,8 +156,15 @@ export function BarberScheduleView({ appointments, blockedSlots, currentDate, ba
                     <Clock className="w-4 h-4 text-gold-DEFAULT" />
                     {format(new Date(apt.scheduled_at), 'HH:mm')}
                   </div>
-                  {apt.is_subscriber && planName && (
-                    <SubscriberBadge planName={planName} size="sm" />
+                  {apt.is_subscriber ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gold-DEFAULT/15 border border-gold-DEFAULT/40 text-gold-DEFAULT font-semibold uppercase tracking-wide">
+                      <Crown className="w-3 h-3" />
+                      {planName ?? 'Assinante'}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-moria-elevated border border-moria-border text-muted-foreground font-medium uppercase tracking-wide">
+                      Avulso
+                    </span>
                   )}
                 </div>
 

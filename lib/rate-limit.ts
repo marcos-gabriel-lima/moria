@@ -56,10 +56,20 @@ export type RateLimitResult = {
   reset:     number
 }
 
+/** Pass-through (success sempre). Usado quando o backend não está configurado. */
+function passThrough(config: LimiterConfig): RateLimitResult {
+  return { success: true, remaining: config.requests, reset: 0 }
+}
+
 /**
- * Resolve o resultado do rate limit quando o backend está down.
+ * Resolve o resultado do rate limit quando o backend está configurado MAS
+ * falhou em runtime (timeout, erro de rede, etc.).
  *
  * Função pura: separada do checkRateLimit pra ser testável sem mock de Redis.
+ *
+ * IMPORTANTE: só aplica quando Redis EXISTE e falhou. Quando Redis nunca foi
+ * configurado, usa `passThrough` em vez disso — porque "configuração ausente"
+ * não deve impedir o usuário de cadastrar.
  */
 export function resolveFailureResult(config: LimiterConfig): RateLimitResult {
   const closed = config.failMode === 'closed'
@@ -73,11 +83,15 @@ export function resolveFailureResult(config: LimiterConfig): RateLimitResult {
 /**
  * Aplica rate limit por chave (user_id, IP ou outra).
  *
- * Quando o Redis não está configurado OU falha (rede/timeout/erro):
- *  - failMode 'open' (default): permite (UX preserva)
- *  - failMode 'closed': bloqueia (proteção contra brute force)
+ * Comportamento por cenário:
+ *  1. Redis NÃO configurado (env vars ausentes) → passa SEMPRE
+ *     (não tratamos isso como "outage"; é deploy sem Upstash, esperado em dev)
+ *  2. Redis configurado, limit OK             → resultado do Upstash
+ *  3. Redis configurado, runtime falha        → respeita `failMode`:
+ *       - open   → passa (UX preserva em outage temporário)
+ *       - closed → bloqueia (proteção contra brute force quando Redis cai)
  *
- * Logamos via console.error em falhas pra que o problema fique visível em prod.
+ * Logamos `console.error` no caminho 3 pra que o Sentry capture.
  */
 export async function checkRateLimit(
   name:   string,
@@ -86,15 +100,16 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const limiter = getLimiter(name, config)
   if (!limiter) {
-    // Sem Redis configurado: silencioso (esperado em dev local)
-    return resolveFailureResult(config)
+    // Cenário 1: sem Redis configurado — não é falha, é setup opcional ausente.
+    // Aplicar failMode aqui quebraria signup/signin em deploys sem Upstash.
+    return passThrough(config)
   }
 
   try {
     const result = await limiter.limit(key)
     return { success: result.success, remaining: result.remaining, reset: result.reset }
   } catch (err) {
-    // Importante: logar pra produção detectar (Sentry pega via console.error wrap)
+    // Cenário 3: Redis configurado mas falhou — agora SIM aplica failMode.
     console.error(`[rate-limit] ${name} falhou pra key=${key.slice(0, 12)}…`, err)
     return resolveFailureResult(config)
   }

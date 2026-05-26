@@ -106,10 +106,10 @@ export default async function EditBarberPage({ params }: { params: Promise<{ id:
               const services = apt.services as any[]
               return (
                 <div key={apt.id} className={cn(
-                  'flex items-center gap-3 p-3 rounded-lg border',
+                  'flex items-center gap-3 p-3 rounded-lg border border-l-4',
                   (apt as any).is_subscriber
-                    ? 'border-gold-DEFAULT/20 bg-gold-DEFAULT/5'
-                    : 'border-moria-border bg-moria-surface'
+                    ? 'border-gold-DEFAULT/40 border-l-gold-DEFAULT bg-gradient-to-r from-gold-DEFAULT/10 to-moria-surface'
+                    : 'border-moria-border border-l-moria-border bg-moria-surface'
                 )}>
                   <div className="text-xs font-bold text-gold-DEFAULT w-10 shrink-0">
                     {format(new Date(apt.scheduled_at), 'dd/MM')}
