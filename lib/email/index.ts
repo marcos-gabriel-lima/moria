@@ -2,6 +2,7 @@ import 'server-only'
 import { Resend } from 'resend'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { escapeHtml, safeHref } from '@/lib/html-escape'
 
 let _resend: Resend | null = null
 function getResend() {
@@ -37,7 +38,9 @@ function pill(text: string) {
   return `<span style="display:inline-block;padding:4px 12px;border-radius:20px;background:#C9A84C22;border:1px solid #C9A84C55;color:#C9A84C;font-size:13px;font-weight:600">${text}</span>`
 }
 function btn(href: string, label: string) {
-  return `<a href="${href}" style="display:inline-block;margin-top:24px;padding:13px 28px;background:#C9A84C;color:#0A0A0A;font-weight:700;font-size:14px;border-radius:8px;text-decoration:none">${label}</a>`
+  // safeHref bloqueia javascript:/data:/etc. Se URL for inválida, vira #.
+  const safe = safeHref(href) ?? '#'
+  return `<a href="${escapeHtml(safe)}" style="display:inline-block;margin-top:24px;padding:13px 28px;background:#C9A84C;color:#0A0A0A;font-weight:700;font-size:14px;border-radius:8px;text-decoration:none">${escapeHtml(label)}</a>`
 }
 function row(label: string, value: string) {
   return `<tr><td style="padding:10px 0;color:#888;font-size:13px;border-bottom:1px solid #222">${label}</td><td style="padding:10px 0;text-align:right;font-weight:600;font-size:13px;border-bottom:1px solid #222">${value}</td></tr>`
@@ -60,11 +63,11 @@ export async function sendAppointmentConfirmedEmail(p: AppointmentEmailParams) {
 
   const body = `
     ${h1('Agendamento confirmado!')}
-    <p style="margin:0 0 24px;color:#999;font-size:14px">Olá, ${gold(p.clientName)}! Seu horário está reservado.</p>
+    <p style="margin:0 0 24px;color:#999;font-size:14px">Olá, ${gold(escapeHtml(p.clientName))}! Seu horário está reservado.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px">
-      ${row('Serviço',  p.serviceName)}
-      ${row('Barbeiro', p.barberName)}
-      ${row('Data',     dateStr)}
+      ${row('Serviço',  escapeHtml(p.serviceName))}
+      ${row('Barbeiro', escapeHtml(p.barberName))}
+      ${row('Data',     escapeHtml(dateStr))}
       ${row('Valor',    p.totalPrice === 0 ? 'Coberto pelo plano' : `R$ ${p.totalPrice.toFixed(2).replace('.', ',')}`)}
     </table>
     <p style="margin:20px 0 0;font-size:13px;color:#666">Precisa cancelar? Acesse o app com até 2h de antecedência.</p>
@@ -89,11 +92,11 @@ export async function sendAppointmentReminderEmail(p: ReminderEmailParams) {
 
   const body = `
     ${h1('Lembrete: seu horário é amanhã!')}
-    <p style="margin:0 0 24px;color:#999;font-size:14px">Olá, ${gold(p.clientName)}! Só passando para lembrar do seu agendamento.</p>
+    <p style="margin:0 0 24px;color:#999;font-size:14px">Olá, ${gold(escapeHtml(p.clientName))}! Só passando para lembrar do seu agendamento.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px">
-      ${row('Serviço',  p.serviceName)}
-      ${row('Barbeiro', p.barberName)}
-      ${row('Data',     dateStr)}
+      ${row('Serviço',  escapeHtml(p.serviceName))}
+      ${row('Barbeiro', escapeHtml(p.barberName))}
+      ${row('Data',     escapeHtml(dateStr))}
     </table>
     <p style="margin:20px 0 0;font-size:13px;color:#666">Nos vemos em breve! Qualquer dúvida, fale pelo WhatsApp.</p>
     ${btn(p.appUrl + '/appointments', 'Ver meu agendamento')}
@@ -112,7 +115,7 @@ type BarberWelcomeParams = {
 export async function sendBarberWelcomeEmail(p: BarberWelcomeParams) {
   const body = `
     ${h1('Bem-vindo à MORIA!')}
-    <p style="margin:0 0 12px;color:#999;font-size:14px">Olá, ${gold(p.name)}!</p>
+    <p style="margin:0 0 12px;color:#999;font-size:14px">Olá, ${gold(escapeHtml(p.name))}!</p>
     <p style="margin:0 0 24px;color:#999;font-size:14px">Você foi adicionado(a) como barbeiro no sistema MORIA. Para acessar sua conta pela primeira vez, defina sua senha clicando abaixo:</p>
     <div style="text-align:center">${btn(p.setPasswordLink, 'Definir minha senha')}</div>
     <p style="margin:24px 0 0;font-size:12px;color:#666;text-align:center">Este link expira em 1 hora. Se expirar, peça à administração para reenviar.</p>
@@ -138,14 +141,15 @@ export async function sendSubscriptionActiveEmail(p: SubscriptionActiveParams) {
   const expStr = format(p.expiresAt, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
+  const safePlan = escapeHtml(p.planName)
   const body = `
     ${h1('Assinatura ativada!')}
-    <p style="margin:0 0 24px;color:#999;font-size:14px">Olá, ${gold(p.clientName)}! Sua assinatura foi confirmada com sucesso.</p>
-    <div style="text-align:center;margin:24px 0">${pill(p.planName)}</div>
+    <p style="margin:0 0 24px;color:#999;font-size:14px">Olá, ${gold(escapeHtml(p.clientName))}! Sua assinatura foi confirmada com sucesso.</p>
+    <div style="text-align:center;margin:24px 0">${pill(safePlan)}</div>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px">
-      ${row('Plano',    p.planName)}
+      ${row('Plano',    safePlan)}
       ${row('Status',   '✅ Ativo')}
-      ${row('Validade', expStr)}
+      ${row('Validade', escapeHtml(expStr))}
     </table>
     <p style="margin:20px 0 0;font-size:13px;color:#666">Aproveite seus benefícios! Use o QR Code no app para validar seus serviços.</p>
     ${btn(appUrl + '/wallet', 'Ver minha carteira')}
