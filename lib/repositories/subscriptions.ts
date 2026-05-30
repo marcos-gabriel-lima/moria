@@ -89,6 +89,9 @@ export const subscriptionsRepo = {
   },
 
   async cancel(db: Db, id: string, reason: string) {
+    // Filtra por status atomicamente — só cancela quem ainda está
+    // active/pending. Antes sobrescrevia cancelled_at/cancel_reason de
+    // subs ja canceladas/expiradas.
     return db
       .from('subscriptions')
       .update({
@@ -98,5 +101,8 @@ export const subscriptionsRepo = {
         auto_renew: false,
       })
       .eq('id', id)
+      .in('status', ['active', 'pending'])
+      .select('id, client_id')
+      .maybeSingle()
   },
 } as const

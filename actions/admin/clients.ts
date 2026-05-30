@@ -7,7 +7,9 @@ import { clientsRepo } from '@/lib/repositories/clients'
 import { subscriptionsRepo } from '@/lib/repositories/subscriptions'
 import { sendSubscriptionActiveEmail } from '@/lib/email'
 import { calculateExpiry, isValidBillingPeriod, ONE_MONTH, type BillingPeriod } from '@/lib/billing'
-import { toActionError } from '@/lib/action-error'
+import { DomainError, toActionError } from '@/lib/action-error'
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
+import { createAdminClient } from '@/lib/supabase/server'
 import type { ActionResult, PaymentMethod } from '@/types'
 
 function revalidateClients(id?: string) {
@@ -50,11 +52,18 @@ export async function cancelClientSubscription(
   reason: string
 ): Promise<ActionResult> {
   if (!idSchema.safeParse(subscriptionId).success) return { success: false, error: 'ID inválido' }
+  if (typeof reason !== 'string' || reason.length > 200) return { success: false, error: 'Motivo inválido' }
   try {
-    const { supabase } = await requireAdmin()
-    const { error } = await subscriptionsRepo.cancel(supabase, subscriptionId, reason)
+    const { userId, supabase } = await requireAdmin()
+
+    const rl = await checkRateLimit('adminCancelSub', userId, RATE_LIMITS.adminAction)
+    if (!rl.success) throw new DomainError('Muitas ações seguidas. Aguarde 1 minuto.')
+
+    const { data, error } = await subscriptionsRepo.cancel(supabase, subscriptionId, reason)
     if (error) throw error
-    revalidateClients()
+    if (!data) throw new DomainError('Assinatura não encontrada ou não está ativa.')
+
+    revalidateClients(data.client_id)
     updateTag('admin-kpis')
     updateTag('admin-recent-subs')
     return { success: true, data: undefined }
@@ -75,7 +84,11 @@ export async function activateSubscription(
   if (!isValidBillingPeriod(period)) return { success: false, error: 'Duração inválida' }
 
   try {
-    const { supabase } = await requireAdmin()
+    const { userId, supabase } = await requireAdmin()
+
+    const rl = await checkRateLimit('adminActivateSub', userId, RATE_LIMITS.adminAction)
+    if (!rl.success) throw new DomainError('Muitas ações seguidas. Aguarde 1 minuto.')
+
     const now = new Date()
     const expiresAt = calculateExpiry(now, period)
 
@@ -84,17 +97,20 @@ export async function activateSubscription(
       expires_at:     expiresAt.toISOString(),
       payment_method: paymentMethod,
     })
-    if (error || !data) throw error ?? new Error('Assinatura não encontrada ou já ativada')
+    if (error || !data) throw error ?? new DomainError('Assinatura não encontrada ou já ativada')
 
     revalidatePath('/admin/subscriptions')
     revalidatePath(`/admin/clients/${data.client_id}`)
     updateTag('admin-kpis')
     updateTag('admin-recent-subs')
 
+    // CRITICO: auth.admin.* exige service_role. O `supabase` do requireAdmin
+    // é cliente anon — chamada falhava silenciosa, email nunca chegava.
     const client = data.client as any
     const plan   = data.plan   as any
     if (client?.id) {
-      const { data: authUser } = await supabase.auth.admin.getUserById(client.id)
+      const adminCli = await createAdminClient()
+      const { data: authUser } = await adminCli.auth.admin.getUserById(client.id)
       const email = authUser?.user?.email
       if (email) {
         await sendSubscriptionActiveEmail({
@@ -122,7 +138,24 @@ export async function grantManualSubscription(
   if (!isValidBillingPeriod(period))         return { success: false, error: 'Duração inválida' }
 
   try {
-    const { supabase } = await requireAdmin()
+    const { userId, supabase } = await requireAdmin()
+
+    const rl = await checkRateLimit('adminGrantSub', userId, RATE_LIMITS.adminAction)
+    if (!rl.success) throw new DomainError('Muitas ações seguidas. Aguarde 1 minuto.')
+
+    // Valida que o destinatário REALMENTE é cliente (não barber/admin).
+    // Antes, admin podia digitar UUID de outro role — INSERT passava na FK
+    // de profiles e barber/admin acabava com subscription ativa.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', clientId)
+      .maybeSingle()
+
+    if (!profile) throw new DomainError('Cliente não encontrado.')
+    if (profile.role !== 'client') throw new DomainError('Este usuário não é cliente.')
+    if (!profile.is_active) throw new DomainError('Cliente está inativo.')
+
     const now = new Date()
     const expiresAt = calculateExpiry(now, period)
 
