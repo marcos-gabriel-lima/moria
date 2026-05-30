@@ -29,14 +29,27 @@ export function ClientDetailActions({
   const [selectedPlan, setSelectedPlan] = useState(plans[0]?.id ?? '')
   const [error, setError] = useState('')
 
-  const run = (fn: () => Promise<void>) => {
+  // Recebe uma server action que retorna ActionResult.
+  // Antes, recebia uma Promise<void> e usava `.then(() => refresh())` — isso
+  // IGNORAVA o `result.success` e o modal fechava mesmo em caso de erro,
+  // dando silent failure (admin pensava que salvou, action rejeitou).
+  type ActionLike = { success: boolean; error?: string } | { success: true; data?: unknown } | void
+  // Recebe uma server action que retorna ActionResult (ou void quando redirect).
+  // Antes, recebia `.then(() => refresh())` e IGNORAVA o `result.success` —
+  // silent failure: modal fechava mesmo se action rejeitasse.
+  const run = (fn: () => Promise<ActionLike>) => {
     setError('')
     startTransition(async () => {
       try {
-        await fn()
+        const result = await fn()
+        if (result && 'success' in result && !result.success) {
+          setError(('error' in result && result.error) || 'Erro inesperado')
+          return
+        }
+        router.refresh()
         setOpen(null)
-      } catch (e: any) {
-        setError(e.message)
+      } catch {
+        setError('Erro inesperado. Tente novamente.')
       }
     })
   }
@@ -75,7 +88,7 @@ export function ClientDetailActions({
 
               {activeSubscriptionId && (
                 <button
-                  onClick={() => run(() => cancelClientSubscription(activeSubscriptionId, 'Cancelado pelo admin').then(() => { router.refresh() }))}
+                  onClick={() => run(() => cancelClientSubscription(activeSubscriptionId, 'Cancelado pelo admin'))}
                   disabled={isPending}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm hover:bg-red-950/20 text-red-400 transition-colors text-left"
                 >
@@ -87,7 +100,7 @@ export function ClientDetailActions({
               <div className="border-t border-moria-border my-1" />
 
               <button
-                onClick={() => run(() => toggleClientActive(clientId, !isActive).then(() => { router.refresh() }))}
+                onClick={() => run(() => toggleClientActive(clientId, !isActive))}
                 disabled={isPending}
                 className={cn(
                   'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left',
@@ -118,8 +131,8 @@ export function ClientDetailActions({
           <div className="flex gap-3 mt-4">
             <button onClick={() => setOpen(null)} className="flex-1 py-2 rounded-lg border border-moria-border text-sm">Cancelar</button>
             <button
-              onClick={() => run(() => updateClientNotes(clientId, notesValue).then(() => { router.refresh() }))}
-              disabled={isPending}
+              onClick={() => run(() => updateClientNotes(clientId, notesValue))}
+              disabled={isPending || notesValue.length > 1000}
               className="flex-1 py-2 rounded-lg bg-gold-gradient text-black font-bold text-sm hover:opacity-90 disabled:opacity-60"
             >
               {isPending ? 'Salvando...' : 'Salvar'}
@@ -150,7 +163,7 @@ export function ClientDetailActions({
           <div className="flex gap-3 mt-4">
             <button onClick={() => setOpen(null)} className="flex-1 py-2 rounded-lg border border-moria-border text-sm">Cancelar</button>
             <button
-              onClick={() => run(() => grantManualSubscription(clientId, selectedPlan, { unit: 'months', value: 1 }).then(() => { router.refresh() }))}
+              onClick={() => run(() => grantManualSubscription(clientId, selectedPlan, { unit: 'months', value: 1 }))}
               disabled={isPending || !selectedPlan}
               className="flex-1 py-2 rounded-lg bg-gold-gradient text-black font-bold text-sm hover:opacity-90 disabled:opacity-60"
             >

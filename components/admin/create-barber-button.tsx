@@ -9,25 +9,30 @@ import { z } from 'zod'
 import { createBarber } from '@/actions/admin'
 import { cn } from '@/lib/utils'
 
+const TIME_REGEX = /^([01]\d|2[0-3]):(00|30)$/
+
 const schema = z.object({
-  full_name: z.string().min(3, 'Nome obrigatório'),
-  email: z.string().email('E-mail inválido'),
-  phone: z.string().optional(),
-  whatsapp: z.string().optional(),
-  specialty: z.string().optional(),
-  bio: z.string().optional(),
-  instagram: z.string().optional(),
+  full_name:       z.string().min(3, 'Nome obrigatório').max(120),
+  email:           z.string().email('E-mail inválido').max(254),
+  phone:           z.string().min(10).max(20).optional().or(z.literal('')),
+  whatsapp:        z.string().min(10).max(20).optional().or(z.literal('')),
+  specialty:       z.string().max(200).optional(),
+  bio:             z.string().max(500).optional(),
+  instagram:       z.string().max(50).optional(),
   commission_rate: z.coerce.number().min(0).max(100).default(50),
-  start_time: z.string().default('08:00'),
-  end_time: z.string().default('18:00'),
-  works_monday: z.boolean().default(true),
-  works_tuesday: z.boolean().default(true),
+  start_time:      z.string().regex(TIME_REGEX, 'Use HH:00 ou HH:30 (00–23h)').default('08:00'),
+  end_time:        z.string().regex(TIME_REGEX, 'Use HH:00 ou HH:30 (00–23h)').default('18:00'),
+  works_monday:    z.boolean().default(true),
+  works_tuesday:   z.boolean().default(true),
   works_wednesday: z.boolean().default(true),
-  works_thursday: z.boolean().default(true),
-  works_friday: z.boolean().default(true),
-  works_saturday: z.boolean().default(true),
-  works_sunday: z.boolean().default(false),
-})
+  works_thursday:  z.boolean().default(true),
+  works_friday:    z.boolean().default(true),
+  works_saturday:  z.boolean().default(true),
+  works_sunday:    z.boolean().default(false),
+}).refine(
+  d => d.start_time < d.end_time,
+  { message: 'Início deve ser antes do fim', path: ['end_time'] },
+)
 
 type FormData = z.infer<typeof schema>
 
@@ -159,7 +164,7 @@ export function CreateBarberButton() {
               )}
 
               <p className="text-xs text-muted-foreground">
-                Uma senha temporária será gerada automaticamente. O barbeiro poderá redefinir pelo login.
+                Um e-mail de boas-vindas será enviado ao barbeiro com link para definir a senha (válido por 1 hora).
               </p>
 
               <div className="flex gap-3 pt-2">

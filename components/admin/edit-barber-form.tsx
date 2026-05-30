@@ -11,24 +11,29 @@ import { ToggleSwitch } from './toggle-switch'
 import { cn } from '@/lib/utils'
 import type { Barber, Profile } from '@/types'
 
+const TIME_REGEX = /^([01]\d|2[0-3]):(00|30)$/
+
 const schema = z.object({
-  full_name: z.string().min(3),
-  phone: z.string().optional(),
-  whatsapp: z.string().optional(),
-  specialty: z.string().optional(),
-  bio: z.string().optional(),
-  instagram: z.string().optional(),
+  full_name:       z.string().min(3).max(120),
+  phone:           z.string().min(10).max(20).optional().or(z.literal('')),
+  whatsapp:        z.string().min(10).max(20).optional().or(z.literal('')),
+  specialty:       z.string().max(200).optional(),
+  bio:             z.string().max(500).optional(),
+  instagram:       z.string().max(50).optional(),
   commission_rate: z.coerce.number().min(0).max(100),
-  start_time: z.string(),
-  end_time: z.string(),
-  works_monday: z.boolean(),
-  works_tuesday: z.boolean(),
+  start_time:      z.string().regex(TIME_REGEX, 'Use HH:00 ou HH:30 (00–23h)'),
+  end_time:        z.string().regex(TIME_REGEX, 'Use HH:00 ou HH:30 (00–23h)'),
+  works_monday:    z.boolean(),
+  works_tuesday:   z.boolean(),
   works_wednesday: z.boolean(),
-  works_thursday: z.boolean(),
-  works_friday: z.boolean(),
-  works_saturday: z.boolean(),
-  works_sunday: z.boolean(),
-})
+  works_thursday:  z.boolean(),
+  works_friday:    z.boolean(),
+  works_saturday:  z.boolean(),
+  works_sunday:    z.boolean(),
+}).refine(
+  d => d.start_time < d.end_time,
+  { message: 'Início deve ser antes do fim', path: ['end_time'] },
+)
 
 type FormData = z.infer<typeof schema>
 

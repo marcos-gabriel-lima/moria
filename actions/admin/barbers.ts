@@ -32,14 +32,17 @@ async function sendBarberInvite(
   await sendBarberWelcomeEmail({ to: email, name, setPasswordLink: actionLink })
 }
 
+// HH:mm com minutos 00 ou 30, hora 00-23 (mesmo do profile self).
+const TIME_REGEX = /^([01]\d|2[0-3]):(00|30)$/
+
 const barberSchema = z.object({
-  full_name:       z.string().min(3),
-  email:           z.string().email(),
-  phone:           z.string().optional(),
-  whatsapp:        z.string().optional(),
-  specialty:       z.array(z.string()).default([]),
-  bio:             z.string().optional(),
-  instagram:       z.string().optional(),
+  full_name:       z.string().min(3).max(120),
+  email:           z.string().email().max(254),
+  phone:           z.string().min(10).max(20).optional(),
+  whatsapp:        z.string().min(10).max(20).optional(),
+  specialty:       z.array(z.string().max(40)).max(10).default([]),
+  bio:             z.string().max(500).optional(),
+  instagram:       z.string().max(50).optional(),
   commission_rate: z.coerce.number().min(0).max(100).default(50),
   works_monday:    z.boolean().default(true),
   works_tuesday:   z.boolean().default(true),
@@ -48,14 +51,35 @@ const barberSchema = z.object({
   works_friday:    z.boolean().default(true),
   works_saturday:  z.boolean().default(true),
   works_sunday:    z.boolean().default(false),
-  start_time:      z.string().default('08:00'),
-  end_time:        z.string().default('18:00'),
-})
+  start_time:      z.string().regex(TIME_REGEX, 'Horário inválido (use HH:00 ou HH:30, 00–23h)').default('08:00'),
+  end_time:        z.string().regex(TIME_REGEX, 'Horário inválido (use HH:00 ou HH:30, 00–23h)').default('18:00'),
+}).refine(
+  d => d.start_time < d.end_time,
+  { message: 'Início do expediente deve ser antes do fim', path: ['end_time'] },
+)
 
-const updateBarberSchema = barberSchema.omit({ email: true, full_name: true }).extend({
-  id:        z.string().uuid(),
-  full_name: z.string().min(3).optional(),
-})
+const updateBarberSchema = z.object({
+  id:              z.string().uuid(),
+  full_name:       z.string().min(3).max(120).optional(),
+  phone:           z.string().min(10).max(20).optional(),
+  whatsapp:        z.string().min(10).max(20).optional(),
+  specialty:       z.array(z.string().max(40)).max(10).default([]),
+  bio:             z.string().max(500).optional(),
+  instagram:       z.string().max(50).optional(),
+  commission_rate: z.coerce.number().min(0).max(100).default(50),
+  works_monday:    z.boolean().default(true),
+  works_tuesday:   z.boolean().default(true),
+  works_wednesday: z.boolean().default(true),
+  works_thursday:  z.boolean().default(true),
+  works_friday:    z.boolean().default(true),
+  works_saturday:  z.boolean().default(true),
+  works_sunday:    z.boolean().default(false),
+  start_time:      z.string().regex(TIME_REGEX, 'Horário inválido (use HH:00 ou HH:30, 00–23h)').default('08:00'),
+  end_time:        z.string().regex(TIME_REGEX, 'Horário inválido (use HH:00 ou HH:30, 00–23h)').default('18:00'),
+}).refine(
+  d => d.start_time < d.end_time,
+  { message: 'Início do expediente deve ser antes do fim', path: ['end_time'] },
+)
 
 const idSchema = z.string().uuid('ID inválido')
 
@@ -71,7 +95,9 @@ export async function createBarber(
 ): Promise<ActionResult<{ id: string }>> {
   try {
     await requireAdmin()
-    const parsed = barberSchema.parse(formData)
+    const parseResult = barberSchema.safeParse(formData)
+    if (!parseResult.success) throw parseResult.error
+    const parsed = parseResult.data
     const adminClient = await createAdminClient()
     const tempPassword = crypto.randomUUID().replace(/-/g, '') + 'A1!'
 
@@ -161,7 +187,9 @@ export async function updateBarber(
 ): Promise<ActionResult> {
   try {
     const { supabase } = await requireAdmin()
-    const { id, full_name, ...rest } = formData
+    const parseResult = updateBarberSchema.safeParse(formData)
+    if (!parseResult.success) throw parseResult.error
+    const { id, full_name, ...rest } = parseResult.data
 
     const barberUpdate = barbersRepo.update(supabase, id, {
       specialty:       rest.specialty,
